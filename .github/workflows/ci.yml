@@ -24,8 +24,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (fail on high/critical vulns)
+        run: npm ci --audit --audit-level=high
 
       - name: Typecheck (renderer + main + preload)
         run: npm run typecheck

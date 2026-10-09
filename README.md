@@ -29,9 +29,9 @@
 
 | Couche | Technologie |
 | --- | --- |
-| Desktop | Electron 31 |
+| Desktop | Electron 44 |
 | UI | React 18 + TypeScript |
-| Build renderer | Vite 5 |
+| Build renderer | Vite 6 |
 | Backend main | Node.js (CommonJS) |
 | IA locale | Client OpenAI-compatible via `fetch` (sans SDK) |
 | Parsing CV | `pdf-parse`, `mammoth` |
