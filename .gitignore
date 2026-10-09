@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+release/
+
+# Logs & local state
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Local AI / secrets — never commit keys or models
+.env
+.env.*
+*.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
