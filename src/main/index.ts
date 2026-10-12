@@ -18,6 +18,7 @@ import type {
   PickFileRequest,
   ProfileSaveRequest,
   ProviderHealthRequest,
+  SampleCvRequest,
   SearchRunRequest
 } from '../shared/ipc';
 
@@ -68,6 +69,7 @@ function registerIpc(): void {
   });
   ipcMain.handle(IPC.cvAnalyzeAts, (_e, req: AnalyzeAtsRequest) => service.analyzeAts(req.cv));
   ipcMain.handle(IPC.cvDetectSlop, (_e, req: DetectSlopRequest) => service.detectSlop(req.cv));
+  ipcMain.handle(IPC.cvSampleCompare, (_e, req: SampleCvRequest) => service.sampleCompare(req.cv));
 
   ipcMain.handle(IPC.providerList, () => service.listProviders());
   ipcMain.handle(IPC.providerSave, (_e, p) => service.saveProvider(p));

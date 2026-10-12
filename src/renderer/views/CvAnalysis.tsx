@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { AtsReport, ParsedCV, SlopReport } from '@shared/types';
+import type { AtsReport, ParsedCV, SampleCvBundle, SampleLevel, SeniorityBand, SlopReport } from '@shared/types';
 
 /** Pick a CV file via the native dialog and return its path (or null). */
 async function pickCvFile(): Promise<string | null> {
@@ -15,6 +15,7 @@ export default function CvAnalysis() {
   const [cv, setCv] = useState<ParsedCV | null>(null);
   const [ats, setAts] = useState<AtsReport | null>(null);
   const [slop, setSlop] = useState<SlopReport | null>(null);
+  const [bundle, setBundle] = useState<SampleCvBundle | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,12 +25,14 @@ export default function CvAnalysis() {
     try {
       const parsed = await window.gotowork.parseCv({ filePath });
       setCv(parsed);
-      const [atsReport, slopReport] = await Promise.all([
+      const [atsReport, slopReport, sampleBundle] = await Promise.all([
         window.gotowork.analyzeAts({ cv: parsed }),
-        window.gotowork.detectSlop({ cv: parsed })
+        window.gotowork.detectSlop({ cv: parsed }),
+        window.gotowork.sampleCompare({ cv: parsed })
       ]);
       setAts(atsReport);
       setSlop(slopReport);
+      setBundle(sampleBundle);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -88,6 +91,7 @@ export default function CvAnalysis() {
 
         {ats && <AtsPanel report={ats} />}
         {slop && <SlopPanel report={slop} />}
+        {bundle && <SampleCvPanel bundle={bundle} />}
       </div>
     </div>
   );
@@ -176,6 +180,121 @@ function SlopPanel({ report }: { report: SlopReport }) {
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+/* ---------------------- sample CVs by level ------------------------ */
+
+const SAMPLE_LEVELS: SampleLevel[] = ['junior', 'mid', 'senior'];
+
+const LEVEL_TAB_LABEL: Record<SampleLevel, string> = {
+  junior: 'Junior',
+  mid: 'Intermédiaire',
+  senior: 'Senior'
+};
+
+const VERDICT_LABEL: Record<'below' | 'at' | 'above', string> = {
+  below: 'En dessous',
+  at: 'Au niveau',
+  above: 'Au-dessus'
+};
+
+/** Map the detected band to the closest reference level (lead → senior). */
+function mapToSampleLevel(band: SeniorityBand): SampleLevel {
+  return band === 'lead' ? 'senior' : band;
+}
+
+function SampleCvPanel({ bundle }: { bundle: SampleCvBundle }) {
+  const [level, setLevel] = useState<SampleLevel>(mapToSampleLevel(bundle.userSeniority));
+  const sample = bundle.samples.find((s) => s.level === level)!;
+  const comp = bundle.comparisons.find((c) => c.level === level)!;
+
+  const verdictClass = comp.verdict === 'below' ? 'warn' : 'ok';
+  const fitColor = comp.fitScore >= 0.8 ? 'var(--ok)' : comp.fitScore >= 0.5 ? 'var(--warn)' : 'var(--bad)';
+
+  return (
+    <div className="card">
+      <div style={{ marginBottom: 14 }}>
+        <div className="card-title" style={{ marginBottom: 4 }}>CV d'exemple par niveau</div>
+        <div className="card-hint" style={{ marginBottom: 0 }}>
+          Même métier : <strong style={{ color: 'var(--text-1)' }}>{bundle.jobFamily}</strong>
+          {bundle.userTitle ? ` · Votre poste : ${bundle.userTitle}` : ''}. Comparez votre CV à des références junior, intermédiaire et senior du même domaine.
+        </div>
+      </div>
+
+      <div className="level-tabs">
+        {SAMPLE_LEVELS.map((l) => (
+          <button key={l} className={`level-tab ${level === l ? 'active' : ''}`} onClick={() => setLevel(l)}>
+            {LEVEL_TAB_LABEL[l]}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid-2" style={{ marginTop: 16 }}>
+        {/* Left — the reference CV for this level */}
+        <div>
+          <div className="row spread" style={{ marginBottom: 8 }}>
+            <div className="card-title" style={{ margin: 0 }}>{sample.title}</div>
+            <span className="badge">{sample.yearsLabel}</span>
+          </div>
+          <pre className="cv-preview">{sample.rawText}</pre>
+        </div>
+
+        {/* Right — how the user's CV compares to this level */}
+        <div>
+          <div className="row spread" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Votre CV vs ce niveau</div>
+              <span className={`badge ${verdictClass}`}>{VERDICT_LABEL[comp.verdict]}</span>
+            </div>
+            <div className="big-score">
+              <span className="num" style={{ color: fitColor, fontSize: 30 }}>{(comp.fitScore * 100).toFixed(0)}</span>
+              <span className="pct">/100</span>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Compétences du métier à ce niveau</div>
+            <div className="job-meta">
+              {comp.skillCoverage.present.map((s) => (
+                <span key={s} className="badge ok">{s}</span>
+              ))}
+              {comp.skillCoverage.missing.map((s) => (
+                <span key={s} className="badge warn">{s}</span>
+              ))}
+            </div>
+          </div>
+
+          {comp.dimensions.map((d) => (
+            <div className="score-row" key={d.id}>
+              <div className="score-label">{d.label}</div>
+              <div className="score-track">
+                <div className="score-fill" style={{ width: `${d.score * 100}%` }} />
+              </div>
+              <div className="score-val">{(d.score * 100).toFixed(0)}</div>
+            </div>
+          ))}
+
+          <div className="divider" />
+          <LabeledList title="À combler" items={comp.gaps} />
+          <LabeledList title="Points forts" items={comp.strengths} />
+          <LabeledList title="Prochaines étapes" items={comp.nextSteps} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LabeledList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>{title}</div>
+      <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-1)', fontSize: 13 }}>
+        {items.map((it, i) => (
+          <li key={i} style={{ marginBottom: 4 }}>{it}</li>
+        ))}
+      </ul>
     </div>
   );
 }
