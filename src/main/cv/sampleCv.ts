@@ -5,8 +5,12 @@
  *   1. Detects the user's **job family** ("corps de métier") from the title,
  *      falling back to skill overlap — so every reference stays in the SAME field.
  *   2. Generates three deterministic reference CVs (junior / intermédiaire /
- *      senior) for that field, weaving a couple of the user's real skills into
- *      the mid/senior references so they read as tailored benchmarks.
+ *      senior) for that field. The prose is grounded in what recruiters and
+ *      hiring managers actually reward in real, well-regarded CVs: action-verb
+ *      bullets following "what you built + tech + scale metric + business
+ *      impact", a large share of quantified lines, and level-appropriate
+ *      signals (junior = deployed projects; mid = end-to-end ownership + first
+ *      mentorship; senior = architecture, team leadership, migrations).
  *   3. Compares the user's CV against each reference along seniority dimensions
  *      (quantified impact, ownership, leadership, field breadth, architecture)
  *      and produces skill coverage + gaps / strengths / next steps.
@@ -37,6 +41,28 @@ interface SkillLadder {
   senior: string[];
 }
 
+/** A single, metric-rich achievement bullet. `min` is the lowest level for
+ *  which this line reads as credible (so a junior CV never shows senior scope). */
+interface Achievement {
+  min: SampleLevel;
+  text: string; // French bullet; may use {s1}/{s2}/{scale} tokens.
+}
+
+/** Field-specific, realistic content used to build the reference-CV prose.
+ *  Modeled on real, recruiter-praised CVs (XYZ / action+system+metric+impact). */
+interface FieldContent {
+  /** Headline scale phrase for the field, e.g. "2M+ utilisateurs mensuels". */
+  scale: string;
+  /** Summary line per level; may use {years}/{s1}/{s2}/{scale}. */
+  summary: Record<SampleLevel, string>;
+  /** Field-specific, quantified achievement bullets (realistic numbers). */
+  achievements: Achievement[];
+  /** Junior-friendly personal-project bullets (key entry-level signal). */
+  projects: string[];
+  /** Formation line per level. */
+  education: Record<SampleLevel, string>;
+}
+
 interface JobFamilyDef {
   id: string;
   /** French field label shown in the UI, e.g. "Développeur Frontend". */
@@ -48,6 +74,8 @@ interface JobFamilyDef {
   /** Matched against the CV title (case-insensitive). */
   detect: RegExp;
   ladder: SkillLadder;
+  /** Realistic, level-appropriate content for the generated reference CVs. */
+  content: FieldContent;
 }
 
 // Ordered most-specific-first so "Full-Stack" wins over "Frontend"/"Backend".
@@ -62,6 +90,33 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['javascript', 'react', 'node.js', 'html'],
       mid: ['typescript', 'postgresql', 'docker', 'next.js'],
       senior: ['system design', 'microservices', 'kubernetes', 'graphql']
+    },
+    content: {
+      scale: '500K+ utilisateurs actifs',
+      summary: {
+        junior: "Développeur full-stack junior avec {years} d'expérience et un portfolio de projets déployés. À l'aise avec {s1} (front) et {s2} (back), orienté produits complets.",
+        mid: "Développeur full-stack intermédiaire avec {years} d'expérience. J'ai livré des fonctionnalités de bout en bout (front + back + base) et mesuré leur impact sur la performance et l'adoption.",
+        senior: "Développeur full-stack senior avec {years} d'expérience. J'architecte des systèmes complets servant {scale} et je fais progresser l'équipe via le mentoring et les revues de conception."
+      },
+      achievements: [
+        { min: 'junior', text: "Développe une application web complète en {s1} et {s2} (CRUD, authentification) déployée en production." },
+        { min: 'junior', text: "Réduit le temps de réponse d'une API de 800ms à 300ms en ajoutant un index SQL et une mise en cache." },
+        { min: 'mid', text: "Conçoit et livre un service REST/GraphQL {s2} utilisé par l'application mobile, avec 95 % de couverture de tests." },
+        { min: 'mid', text: "Optimise les requêtes {s2}, passant le p95 de 400ms à 90ms sur l'endpoint le plus sollicité." },
+        { min: 'mid', text: "Met en place un pipeline CI/CD (Docker) réduisant le temps de déploiement de 30 min à 6 min." },
+        { min: 'senior', text: "Architecte une plateforme full-stack servant {scale}, atteignant 99,9 % d'uptime et un p95 < 150ms." },
+        { min: 'senior', text: "Pilote la migration d'un monolithe vers des microservices (Docker/Kubernetes) sans interruption de service." },
+        { min: 'senior', text: "Mentore 4 développeurs et anime les revues d'architecture, réduisant les incidents de production de 40 %." }
+      ],
+      projects: [
+        "SaaS de gestion de tâches en React + Node.js + PostgreSQL, déployé sur AWS (authentification, paiements Stripe).",
+        "API publique REST documentée (OpenAPI) avec tests E2E, open source (120 étoiles GitHub)."
+      ],
+      education: {
+        junior: 'Licence / BUT Informatique · Formation continue en développement web',
+        mid: 'Licence / Master Informatique',
+        senior: 'Master / Ingénieur Informatique · Certifications cloud (AWS/Azure)'
+      }
     }
   },
   {
@@ -74,6 +129,35 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['html', 'css', 'javascript', 'react'],
       mid: ['typescript', 'next.js', 'tailwind', 'jest', 'vite'],
       senior: ['system design', 'graphql', 'cypress']
+    },
+    content: {
+      scale: '2M+ utilisateurs mensuels',
+      summary: {
+        junior: "Développeur frontend junior avec {years} d'expérience et un portfolio de projets déployés. Solide sur {s1} et {s2}, orienté performance et accessibilité.",
+        mid: "Développeur frontend intermédiaire avec {years} d'expérience. J'ai livré des interfaces de bout en bout et mesuré leur impact (performance, conversion) sur des applications à fort trafic.",
+        senior: "Développeur frontend senior avec {years} d'expérience. J'architecte des interfaces servant {scale} et je fais progresser l'équipe via le mentoring et les revues de conception."
+      },
+      achievements: [
+        { min: 'junior', text: "Réduit le temps de chargement d'une page de 2,1s à 0,8s en optimisant le rendu {s1} et la taille du bundle." },
+        { min: 'junior', text: "Développe des composants réutilisables {s1} utilisés par 3 équipes produit." },
+        { min: 'junior', text: "Améliore le score Lighthouse d'un site de 62 à 94 (performance + accessibilité)." },
+        { min: 'mid', text: "Conçoit et développe un module {s1} utilisé quotidiennement par des milliers d'utilisateurs, avec 85 % de couverture de tests." },
+        { min: 'mid', text: "Optimise le rendu {s1}, réduisant le temps d'affichage initial de 40 % (3,2s → 1,9s)." },
+        { min: 'mid', text: "Met en place un design system de 40+ composants adopté par 2 équipes produit." },
+        { min: 'senior', text: "Architecte la refonte frontend d'une plateforme servant {scale}, atteignant 98 Lighthouse et réduisant le TTI de 5,8s à 2,1s." },
+        { min: 'senior', text: "Pilote la migration Angular → React pour une application à fort trafic, sans interruption de service." },
+        { min: 'senior', text: "Bâtit un design system de 120+ composants adopté par 8 équipes, standardisant le développement frontend." },
+        { min: 'senior', text: "Mentore 4 développeurs et anime les revues de conception, réduisant les régressions de production de 35 %." }
+      ],
+      projects: [
+        "E-commerce React + TypeScript (SSR) déployé sur Vercel — 98 Lighthouse, panier et paiement.",
+        "Dashboard temps réel en React + WebSocket affichant des métriques live, open source (120 étoiles)."
+      ],
+      education: {
+        junior: 'Licence / BUT Informatique · Certification frontend',
+        mid: 'Licence / Master Informatique',
+        senior: 'Master / Ingénieur Informatique · Formation en architecture frontend'
+      }
     }
   },
   {
@@ -86,6 +170,34 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['node.js', 'express', 'postgresql', 'rest'],
       mid: ['typescript', 'docker', 'redis', 'ci/cd'],
       senior: ['microservices', 'system design', 'kubernetes', 'kafka']
+    },
+    content: {
+      scale: '30M+ requêtes API par jour',
+      summary: {
+        junior: "Développeur backend junior avec {years} d'expérience et des projets déployés. À l'aise avec {s1} et {s2}, orienté APIs robustes et bases de données.",
+        mid: "Développeur backend intermédiaire avec {years} d'expérience. J'ai conçu des services de bout en bout (API, base, cache) et mesuré leur impact sur la performance et la fiabilité.",
+        senior: "Développeur backend senior avec {years} d'expérience. J'architecte des systèmes distribués traitant {scale} et je fais progresser l'équipe via le mentoring et les revues de conception."
+      },
+      achievements: [
+        { min: 'junior', text: "Développe des endpoints REST {s1} (CRUD, validation) avec une couverture de tests de 80 %." },
+        { min: 'junior', text: "Réduit le temps de réponse d'une API de 900ms à 250ms en ajoutant un index et une cache Redis." },
+        { min: 'mid', text: "Conçoit un service {s1} gérant l'authentification et les rôles, utilisé par 3 applications front." },
+        { min: 'mid', text: "Optimise les requêtes {s2}, passant le p95 de 450ms à 80ms sur l'endpoint le plus sollicité." },
+        { min: 'mid', text: "Met en place une cache Redis, réduisant la charge base de données de 60 %." },
+        { min: 'senior', text: "Architecte une plateforme de microservices traitant {scale} avec 99,98 % d'uptime." },
+        { min: 'senior', text: "Pilote la migration monolithe → microservices (Kafka, Kubernetes) en zéro downtime, réduisant la charge requêtes de 64 %." },
+        { min: 'senior', text: "Conçoit un API gateway (rate limiting, auth) centralisant 7 services et réduisant les coûts d'infra de 30 %." },
+        { min: 'senior', text: "Mentore 3 ingénieurs sur le system design et l'optimisation SQL, améliorant la vélocité de l'équipe de 35 %." }
+      ],
+      projects: [
+        "API REST {s1} + PostgreSQL (auth JWT, pagination) déployée sur AWS ECS, documentée OpenAPI.",
+        "Pipeline d'indexation en {s2} traitant 1M d'entrées/heure, open source."
+      ],
+      education: {
+        junior: 'Licence / BUT Informatique · Certification backend',
+        mid: 'Licence / Master Informatique',
+        senior: 'Master / Ingénieur Informatique · Certifications cloud (AWS/GCP)'
+      }
     }
   },
   {
@@ -98,6 +210,34 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['linux', 'docker', 'bash', 'git'],
       mid: ['kubernetes', 'terraform', 'ci/cd', 'aws'],
       senior: ['ansible', 'microservices', 'elasticsearch']
+    },
+    content: {
+      scale: "des dizaines d'équipes produit",
+      summary: {
+        junior: "Ingénieur DevOps junior avec {years} d'expérience. À l'aise avec {s1} et {s2}, orienté automatisation et fiabilité des déploiements.",
+        mid: "Ingénieur DevOps intermédiaire avec {years} d'expérience. J'ai industrialisé les déploiements (CI/CD, conteneurs) et mesuré l'impact sur la fréquence de release et la fiabilité.",
+        senior: "Ingénieur DevOps / plateforme senior avec {years} d'expérience. J'architecte des plateformes servant {scale} et je fais progresser les équipes via le mentoring et les standards d'infra."
+      },
+      achievements: [
+        { min: 'junior', text: "Automatise les déploiements avec Docker et des scripts {s2}, réduisant le temps de mise en prod de 40 min à 8 min." },
+        { min: 'junior', text: "Met en place la surveillance (logs, alertes) pour une application {s1}." },
+        { min: 'mid', text: "Industrialise un pipeline CI/CD ({s1}) passant les déploiements de hebdomadaires à quotidiens." },
+        { min: 'mid', text: "Conteneurise 6 services sur Kubernetes, améliorant la scalabilité et réduisant les incidents de 40 %." },
+        { min: 'mid', text: "Met en place l'infra-as-code (Terraform), réduisant la dérive configuration et le temps d'onboarding de 50 %." },
+        { min: 'senior', text: "Architecte une plateforme Kubernetes multi-équipes servant {scale}, avec autoscaling et zéro downtime." },
+        { min: 'senior', text: "Pilote la migration vers l'infra-as-code (Terraform), réduisant les coûts cloud de 30 %." },
+        { min: 'senior', text: "Définit les standards SRE (SLO, on-call, postmortem) adoptés par 5 équipes, réduisant le MTTR de 45 %." },
+        { min: 'senior', text: "Mentore 3 ingénieurs et anime la guild architecture infra." }
+      ],
+      projects: [
+        "Homelab Kubernetes (Terraform + Helm) documenté, déployant une stack full-stack en moins de 10 min.",
+        "Pipeline CI/CD GitHub Actions avec déploiement blue/green, open source."
+      ],
+      education: {
+        junior: 'BUT / Licence Informatique · Certification cloud (AWS/Azure)',
+        mid: 'Licence / Master Informatique',
+        senior: 'Master / Ingénieur Informatique · Certifications DevOps/SRE (CKA, Terraform)'
+      }
     }
   },
   {
@@ -110,6 +250,34 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['python', 'sql', 'data analysis'],
       mid: ['machine learning', 'pytorch', 'postgresql'],
       senior: ['llm', 'nlp', 'tensorflow', 'system design']
+    },
+    content: {
+      scale: '2 To de données par jour',
+      summary: {
+        junior: "Ingénieur Data junior avec {years} d'expérience et des projets concrets. À l'aise avec {s1} et {s2}, orienté qualité des données et analyse.",
+        mid: "Ingénieur Data intermédiaire avec {years} d'expérience. J'ai construit des pipelines et des modèles de bout en bout et mesuré leur impact (précision, temps de traitement, décision business).",
+        senior: "Ingénieur Data / IA senior avec {years} d'expérience. J'architecte des plateformes data traitant {scale} et je fais progresser l'équipe via le mentoring et les revues de modèles."
+      },
+      achievements: [
+        { min: 'junior', text: "Construit des dashboards {s1} (SQL, Python) suivis par 50+ utilisateurs métier." },
+        { min: 'junior', text: "Automatise un rapport hebdomadaire en Python, faisant gagner 3 h/semaine à l'équipe." },
+        { min: 'mid', text: "Conçoit un pipeline ETL ({s1}) traitant {scale} et réduisant le temps de traitement de 6 h à 45 min." },
+        { min: 'mid', text: "Développe un modèle de prédiction ({s2}) améliorant la précision de 12 points, déployé en production." },
+        { min: 'mid', text: "Met en place la validation de données (Great Expectations), réduisant les incidents data de 50 %." },
+        { min: 'senior', text: "Architecte une plateforme data/ML servant {scale}, avec orchestration (Airflow) et gouvernance." },
+        { min: 'senior', text: "Pilote le déploiement de modèles LLM en production, réduisant le coût d'inférence de 40 %." },
+        { min: 'senior', text: "Met en place la data governance (catalogue, qualité, accès) adoptée par 6 équipes." },
+        { min: 'senior', text: "Mentore 3 ingénieurs data et anime les revues de conception des modèles." }
+      ],
+      projects: [
+        "Pipeline ETL Python + Airflow traitant un jeu de données public, documenté et testé.",
+        "Modèle ML (PyTorch) déployé en API avec A/B test, open source."
+      ],
+      education: {
+        junior: 'Licence / Master Informatique ou Statistiques · Certification data',
+        mid: 'Master Informatique / Data Science',
+        senior: 'Master / Doctorat Data & IA · Certifications cloud/ML'
+      }
     }
   },
   {
@@ -122,6 +290,34 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['javascript', 'react', 'html'],
       mid: ['typescript', 'graphql', 'rest'],
       senior: ['system design', 'cypress', 'grpc']
+    },
+    content: {
+      scale: '1M+ téléchargements cumulés',
+      summary: {
+        junior: "Développeur mobile junior avec {years} d'expérience et des apps déployées. À l'aise avec {s1} et {s2}, orienté performance et UX fluide.",
+        mid: "Développeur mobile intermédiaire avec {years} d'expérience. J'ai livré des fonctionnalités de bout en bout (offline, push, perf) et mesuré leur impact sur la rétention et la stabilité.",
+        senior: "Développeur mobile senior avec {years} d'expérience. J'architecte des applications comptabilisant {scale} et je fais progresser l'équipe via le mentoring et les standards de qualité."
+      },
+      achievements: [
+        { min: 'junior', text: "Développe une fonctionnalité {s1} (navigation, offline) utilisée par des milliers d'utilisateurs." },
+        { min: 'junior', text: "Corrige des fuites mémoire réduisant le crash rate de 2,1 % à 0,8 %." },
+        { min: 'mid', text: "Conçoit et livre un module {s1} (offline-first, sync) améliorant la rétention de 8 %." },
+        { min: 'mid', text: "Optimise le démarrage de l'app, réduisant le cold start de 4s à 1,2s." },
+        { min: 'mid', text: "Met en place les tests E2E ({s2}), réduisant les régressions en prod de 40 %." },
+        { min: 'senior', text: "Architecte une application {s1} comptabilisant {scale}, avec un crash rate < 0,5 % et 4,7/5 sur les stores." },
+        { min: 'senior', text: "Pilote la migration vers une architecture modulaire (feature-first), accélérant les releases de 30 %." },
+        { min: 'senior', text: "Définit les standards de performance et d'accessibilité mobile, adoptés par 3 équipes." },
+        { min: 'senior', text: "Mentore 4 développeurs mobiles et anime les revues de code." }
+      ],
+      projects: [
+        "App mobile {s1} (offline, push notifications) publiée sur les stores, open source.",
+        "Kit de composants mobile réutilisables avec tests E2E, utilisé par 2 apps."
+      ],
+      education: {
+        junior: 'Licence / BUT Informatique · Certification mobile',
+        mid: 'Licence / Master Informatique',
+        senior: 'Master / Ingénieur Informatique · Certifications (React Native/Flutter)'
+      }
     }
   },
   {
@@ -134,6 +330,34 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['testing', 'jest', 'cypress'],
       mid: ['python', 'ci/cd', 'docker'],
       senior: ['system design', 'tdd', 'microservices']
+    },
+    content: {
+      scale: '95 % de couverture sur les parcours critiques',
+      summary: {
+        junior: "Ingénieur QA junior avec {years} d'expérience. À l'aise avec {s1} et {s2}, orienté fiabilité et détection précoce des défauts.",
+        mid: "Ingénieur QA intermédiaire avec {years} d'expérience. J'ai industrialisé la qualité (automatisation, CI) et mesuré l'impact sur les défauts échappés et le temps de release.",
+        senior: "Ingénieur QA / Test senior avec {years} d'expérience. J'architecte la stratégie de test (atteignant {scale}) et je fais progresser l'équipe via le mentoring et les standards qualité."
+      },
+      achievements: [
+        { min: 'junior', text: "Rédige des tests {s1} pour les parcours critiques, atteignant 80 % de couverture." },
+        { min: 'junior', text: "Automatise une batterie de tests de régression réduisant le temps de validation de 2 j à 3 h." },
+        { min: 'mid', text: "Industrialise la suite d'automatisation ({s1}) dans la CI, détectant les régressions avant merge." },
+        { min: 'mid', text: "Met en place des tests de charge (k6), identifiant un goulot qui réduit le p95 de 300ms à 120ms." },
+        { min: 'mid', text: "Réduit le taux de défauts échappés de 40 % grâce à une meilleure couverture E2E." },
+        { min: 'senior', text: "Architecte la stratégie de test (pyramide, qualité dans la CI) servant {scale}." },
+        { min: 'senior', text: "Pilote la mise en place du TDD et des tests contractuels, réduisant les incidents post-release de 50 %." },
+        { min: 'senior', text: "Met en place l'observabilité des tests (détection flaky, métriques) adoptée par 4 équipes." },
+        { min: 'senior', text: "Mentore 3 ingénieurs QA et anime les revues de qualité." }
+      ],
+      projects: [
+        "Suite E2E {s1} open source couvrant un parcours critique, intégrée en CI.",
+        "Outil de charge k6 + dashboards, documenté et réutilisable."
+      ],
+      education: {
+        junior: 'Licence / BUT Informatique · Certification QA (ISTQB)',
+        mid: 'Licence / Master Informatique',
+        senior: 'Master / Ingénieur Informatique · Certifications qualité/automatisation'
+      }
     }
   },
   {
@@ -146,6 +370,33 @@ const FAMILIES: JobFamilyDef[] = [
       junior: ['javascript', 'typescript', 'git', 'rest'],
       mid: ['node.js', 'react', 'docker', 'postgresql'],
       senior: ['system design', 'microservices', 'kubernetes', 'ci/cd']
+    },
+    content: {
+      scale: 'des applications à fort trafic',
+      summary: {
+        junior: "Développeur logiciel junior avec {years} d'expérience et un portfolio de projets. À l'aise avec {s1} et {s2}, orienté résultats et apprentissage rapide.",
+        mid: "Développeur logiciel intermédiaire avec {years} d'expérience. J'ai livré des fonctionnalités de bout en bout et mesuré leur impact sur la performance et l'adoption.",
+        senior: "Développeur logiciel senior avec {years} d'expérience. J'architecte des systèmes robustes servant {scale} et je fais progresser l'équipe via le mentoring et les revues de conception."
+      },
+      achievements: [
+        { min: 'junior', text: "Développe des fonctionnalités {s1} (CRUD, API) avec une couverture de tests de 75 %." },
+        { min: 'junior', text: "Réduit le temps d'exécution d'un traitement batch de 20 min à 4 min." },
+        { min: 'mid', text: "Conçoit et livre un service {s1} utilisé par 3 équipes, avec 90 % de couverture de tests." },
+        { min: 'mid', text: "Optimise les performances (cache, requêtes), réduisant le p95 de 500ms à 100ms." },
+        { min: 'mid', text: "Met en place la CI/CD (Docker), réduisant le temps de déploiement de 30 min à 5 min." },
+        { min: 'senior', text: "Architecte une plateforme {s1} servant {scale}, atteignant 99,9 % d'uptime." },
+        { min: 'senior', text: "Pilote la migration vers des microservices (Kubernetes) sans interruption de service." },
+        { min: 'senior', text: "Mentore 4 développeurs et anime les revues d'architecture, réduisant les incidents de production de 40 %." }
+      ],
+      projects: [
+        "Application web complète {s1} + API, déployée en production avec authentification et tests.",
+        "Outil open source {s2} (150 étoiles GitHub) avec documentation et CI."
+      ],
+      education: {
+        junior: 'Licence / BUT Informatique',
+        mid: 'Licence / Master Informatique',
+        senior: 'Master / Ingénieur Informatique · Certifications cloud/architecture'
+      }
     }
   }
 ];
@@ -165,6 +416,9 @@ const LEVEL_YEARS: Record<SampleLevel, string> = {
   mid: '3–5 ans',
   senior: '6+ ans'
 };
+
+/** Ordinal rank used to order achievements / pick level-appropriate lines. */
+const LEVEL_RANK: Record<SampleLevel, number> = { junior: 0, mid: 1, senior: 2 };
 
 /* ------------------------------ helpers ---------------------------- */
 
@@ -227,75 +481,57 @@ function pickHeadline(expected: string[]): [string, string] {
   return [pool[0] ?? '', pool[1] ?? pool[0] ?? ''];
 }
 
+/** Replace {token} placeholders in a template with provided values. */
+function fillTokens(tpl: string, vars: Record<string, string>): string {
+  return tpl.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m);
+}
+
 function buildSampleCvText(family: JobFamilyDef, level: SampleLevel, extraSkills: string[]): string {
+  const c = family.content;
   const expected = fullLadderUpTo(family, level);
   const [s1, s2] = pickHeadline(expected);
+  const vars: Record<string, string> = { s1, s2, years: LEVEL_YEARS[level], scale: c.scale };
+
+  // Select tier-appropriate achievements, most advanced first (so a senior CV
+  // leads with its strongest lines and a junior never shows senior scope).
+  const eligible = c.achievements
+    .filter((a) => LEVEL_RANK[a.min] <= LEVEL_RANK[level])
+    .sort((a, b) => LEVEL_RANK[b.min] - LEVEL_RANK[a.min]);
+
+  const primaryCount = level === 'junior' ? 2 : 3;
+  const secondaryCount = level === 'junior' ? 0 : level === 'mid' ? 1 : 2;
+  const primary = eligible.slice(0, primaryCount).map((a) => `• ${fillTokens(a.text, vars)}`);
+  const secondary = eligible.slice(primaryCount, primaryCount + secondaryCount).map((a) => `• ${fillTokens(a.text, vars)}`);
 
   // Weave a couple of the user's real (out-of-ladder) skills into mid/senior.
   const skillLine =
-    level === 'junior'
-      ? expected.join(', ')
-      : Array.from(new Set([...expected, ...extraSkills])).join(', ');
+    level === 'junior' ? expected.join(', ') : Array.from(new Set([...expected, ...extraSkills])).join(', ');
 
   const head = [
     'Alex Martin',
     `${family.titleNoun} ${LEVEL_LABEL[level]}`,
-    'Paris, France · alex.martin@email.fr · +33 6 12 34 56 78 · linkedin.com/in/alexmartin',
-    ''
+    'Paris, France · alex.martin@email.fr · +33 6 12 34 56 78 · linkedin.com/in/alexmartin'
   ].join('\n');
 
-  let summary = '';
-  let experience = '';
-  let education = '';
+  const summary = fillTokens(c.summary[level], vars);
 
+  // Role titles (current + previous), scaled by level.
+  const roleTitles: Record<SampleLevel, [string, string]> = {
+    junior: ['Stage — Développeur Junior · Studio Web (2024, 6 mois)', 'Projets personnels'],
+    mid: ['Développeur · Scale-up (2022–présent)', 'Développeur Junior · Agence (2020–2022)'],
+    senior: ['Lead technique · Scale-up (2019–présent)', 'Développeur · EdTech (2016–2019)']
+  };
+  const [role1Title, role2Title] = roleTitles[level];
+
+  const exp: string[] = [role1Title, ...primary];
   if (level === 'junior') {
-    summary =
-      `Développeur ${family.short} junior, à l'aise avec ${s1} et ${s2}. ` +
-      "Je cherche un premier poste pour mettre en pratique mes bases solides et progresser sur des projets concrets.";
-    experience = [
-      'Stage — Développeur Junior · Studio Web (2024, 6 mois)',
-      `• Participe au développement d'interfaces ${s1} sous la supervision d'un développeur senior.`,
-      '• Corrige des bugs et améliore la lisibilité du code existant.',
-      '',
-      'Projet académique — Application web (2023)',
-      `• Développe un site vitrine en ${s1} et ${s2} pour un projet de fin d'études.`
-    ].join('\n');
-    education = 'Licence / BUT informatique · Université de Paris (2021–2024)';
-  } else if (level === 'mid') {
-    summary =
-      `Développeur ${family.short} intermédiaire avec 3 à 5 ans d'expérience. ` +
-      "J'autonomise des fonctionnalités de bout en bout et j'ai l'habitude de mesurer l'impact de mon travail.";
-    experience = [
-      'Développeur · Scale-up (2022–présent)',
-      `• Conçoit et développe des modules ${s1} utilisés quotidiennement par les équipes.`,
-      `• Réduit le temps de chargement de 35 % en optimisant ${s2}.`,
-      '• Met en place une suite de tests qui divise les régressions par deux.',
-      '',
-      'Développeur Junior · Agence (2020–2022)',
-      `• Développe des pages et composants ${s1} pour plusieurs clients.`
-    ].join('\n');
-    education = 'Licence / BUT informatique · Université de Paris (2018–2021)';
+    // Junior CVs live on deployed projects — a key entry-level signal.
+    exp.push('', role2Title, ...c.projects.map((p) => `• ${fillTokens(p, vars)}`));
   } else {
-    summary =
-      `Développeur ${family.short} senior, plus de 6 ans d'expérience. ` +
-      "J'architecte des solutions, je pilote des initiatives techniques et j'accompagne les développeurs plus juniors de l'équipe.";
-    experience = [
-      'Lead technique · Scale-up (2019–présent)',
-      `• Pilote la conception d'architecture ${s1} pour une plateforme utilisée par des milliers d'utilisateurs.`,
-      "• Migre le cœur du système vers des microservices, réduisant les coûts d'infrastructure de 30 %.",
-      '• Mentore quatre développeurs juniors et anime les revues de code.',
-      '• Définit la roadmap technique avec le produit et les autres équipes.',
-      '',
-      'Développeur · EdTech (2016–2019)',
-      `• Responsable de modules critiques ${s2}, de la conception à la mise en production.`,
-      '',
-      'Développeur Junior · ESN (2014–2016)',
-      `• Développe et maintient des applications ${s1} pour des clients variés.`
-    ].join('\n');
-    education = 'Licence informatique · Université de Paris (2012–2015) · Formation continue en architecture logicielle';
+    exp.push('', role2Title, ...secondary);
   }
 
-  return [head, `Profil\n${summary}`, '', `Expérience\n${experience}`, '', `Compétences\n${skillLine}`, '', `Formation\n${education}`].join('\n');
+  return [head, `Profil\n${summary}`, '', `Expérience\n${exp.join('\n')}`, '', `Compétences\n${skillLine}`, '', `Formation\n${c.education[level]}`].join('\n');
 }
 
 /* --------------------------- dimension scoring --------------------- */
@@ -457,8 +693,8 @@ function buildGaps(
   const weak = (id: string) => expected[id] > 0 && dimScores[id] < expected[id] * 0.6;
   if (weak('impact')) gaps.push('Peu de résultats chiffrés : ajoutez des %, délais réduits ou coûts évités.');
   if (weak('ownership')) gaps.push('Portée floue : formulez « pilote », « responsable de » plutôt que « a fait partie de ».');
-  if (level === 'senior' && weak('leadership')) gaps.push('Pas de signal de mentorat / encadrement d\'équipe, attendu à ce niveau.');
-  if (level === 'senior' && weak('architecture')) gaps.push('Aucune conception d\'architecture ou de microservices mise en avant.');
+  if (level === 'senior' && weak('leadership')) gaps.push("Pas de signal de mentorat / encadrement d'équipe, attendu à ce niveau.");
+  if (level === 'senior' && weak('architecture')) gaps.push("Aucune conception d'architecture ou de microservices mise en avant.");
   if (weak('breadth')) gaps.push(`Maîtrise partielle du métier : élargissez le panel de compétences (voir liste attendue).`);
 
   return gaps.length ? gaps.slice(0, 5) : ['Aucun écart majeur par rapport à ce niveau.'];
@@ -481,7 +717,7 @@ function buildStrengths(
   const strong = (id: string) => expected[id] > 0 && dimScores[id] >= expected[id];
   if (strong('impact')) strengths.push('Résultats bien chiffrés — un vrai signal pour les recruteurs.');
   if (strong('leadership')) strengths.push('Leadership / mentorat déjà présent dans le CV.');
-  if (strong('architecture')) strengths.push('Conception d\'architecture mise en avant, au niveau attendu.');
+  if (strong('architecture')) strengths.push("Conception d'architecture mise en avant, au niveau attendu.");
   if (strong('ownership')) strengths.push('Responsabilités clairement formulées.');
 
   return strengths.length ? strengths.slice(0, 4) : ['Le CV est cohérent avec ce niveau, sans écart majeur.'];
@@ -498,9 +734,9 @@ function buildNextSteps(
 
   const weak = (id: string) => expected[id] > 0 && dimScores[id] < expected[id] * 0.6;
   if (weak('impact')) steps.push('Chiffrez 2–3 réalisations marquantes (impact en %, gain de temps, coût évité).');
-  if (weak('ownership')) steps.push('Réécrivez vos puces en verbes d\'action avec un résultat mesurable.');
+  if (weak('ownership')) steps.push("Réécrivez vos puces en verbes d'action avec un résultat mesurable.");
   if (level === 'senior' && weak('leadership')) steps.push('Ajoutez une ligne sur le mentorat / l\'encadrement d\'équipe.');
-  if (level === 'senior' && weak('architecture')) steps.push('Décrivez un projet d\'architecture que vous avez conduit de bout en bout.');
+  if (level === 'senior' && weak('architecture')) steps.push("Décrivez un projet d'architecture que vous avez conduit de bout en bout.");
 
   return steps.length ? steps.slice(0, 5) : ['Votre CV atteint déjà ce niveau — visez le palier supérieur.'];
 }
