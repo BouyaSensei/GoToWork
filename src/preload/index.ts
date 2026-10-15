@@ -27,6 +27,7 @@ const IPC = {
   providerRemove: 'provider:remove',
   providerSetActive: 'provider:set-active',
   providerHealth: 'provider:health',
+  providerActiveHealth: 'provider:active-health',
 
   profileGet: 'profile:get',
   profileSave: 'profile:save',
@@ -51,6 +52,7 @@ const api: GoToWorkApi = {
   removeProvider: (id) => ipcRenderer.invoke(IPC.providerRemove, id),
   setActiveProvider: (id) => ipcRenderer.invoke(IPC.providerSetActive, id),
   providerHealth: (req) => ipcRenderer.invoke(IPC.providerHealth, req),
+  activeProviderHealth: () => ipcRenderer.invoke(IPC.providerActiveHealth),
 
   getProfile: () => ipcRenderer.invoke(IPC.profileGet),
   saveProfile: (req) => ipcRenderer.invoke(IPC.profileSave, req),

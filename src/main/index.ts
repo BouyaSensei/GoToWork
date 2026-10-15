@@ -78,6 +78,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.providerHealth, (_e, req: ProviderHealthRequest) =>
     service.providerHealth(req.providerId)
   );
+  ipcMain.handle(IPC.providerActiveHealth, () => service.activeProviderHealth());
 
   ipcMain.handle(IPC.profileGet, () => service.getProfile());
   ipcMain.handle(IPC.profileSave, (_e, req: ProfileSaveRequest) => service.saveProfile(req.profile));

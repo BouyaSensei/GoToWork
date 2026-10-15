@@ -36,6 +36,7 @@ export const IPC = {
   providerRemove: 'provider:remove',
   providerSetActive: 'provider:set-active',
   providerHealth: 'provider:health',
+  providerActiveHealth: 'provider:active-health',
 
   // Profile
   profileGet: 'profile:get',
@@ -117,6 +118,8 @@ export interface GoToWorkApi {
   removeProvider(id: string): Promise<void>;
   setActiveProvider(id: string): Promise<void>;
   providerHealth(req: ProviderHealthRequest): Promise<ProviderHealth>;
+  /** Health of the active (enabled) provider, or null when none is configured. */
+  activeProviderHealth(): Promise<ProviderHealth | null>;
 
   getProfile(): Promise<UserProfile>;
   saveProfile(req: ProfileSaveRequest): Promise<void>;

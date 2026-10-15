@@ -25,14 +25,16 @@ export default function CvAnalysis() {
     try {
       const parsed = await window.gotowork.parseCv({ filePath });
       setCv(parsed);
-      const [atsReport, slopReport, sampleBundle] = await Promise.all([
+      const [health, atsReport, slopReport] = await Promise.all([
+        window.gotowork.activeProviderHealth(),
         window.gotowork.analyzeAts({ cv: parsed }),
-        window.gotowork.detectSlop({ cv: parsed }),
-        window.gotowork.sampleCompare({ cv: parsed })
+        window.gotowork.detectSlop({ cv: parsed })
       ]);
       setAts(atsReport);
       setSlop(slopReport);
-      setBundle(sampleBundle);
+      // The sample CVs are static templates: only show them when a local AI
+      // provider is actually connected — otherwise this section returns nothing.
+      setBundle(health?.reachable ? await window.gotowork.sampleCompare({ cv: parsed }) : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

@@ -114,6 +114,16 @@ export class AppService {
     return new LocalAIProvider(cfg).health();
   }
 
+  /** Health of the active provider, or null when none is configured/enabled.
+   *  The renderer gates AI-dependent sections on this: no live connection →
+   *  those sections return nothing instead of static template content. */
+  async activeProviderHealth(): Promise<ProviderHealth | null> {
+    const s = this.store.get();
+    const cfg = s.providers.find((p) => p.id === s.activeProviderId) ?? s.providers[0];
+    if (!cfg || !cfg.enabled) return null;
+    return new LocalAIProvider(cfg).health();
+  }
+
   private activeProvider(): LocalAIProvider {
     const s = this.store.get();
     const cfg = s.providers.find((p) => p.id === s.activeProviderId) ?? s.providers[0];
