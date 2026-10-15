@@ -120,6 +120,9 @@ body {
 /* --------------------------- main pane ------------------------ */
 
 .main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+/* Each view renders a plain <div> root — it must become a constrained flex
+   column, otherwise .content grows to its full height and is clipped here. */
+.main > div { display: flex; flex-direction: column; min-height: 0; }
 .main-header {
   padding: 20px 28px 14px;
   border-bottom: 1px solid var(--line);
