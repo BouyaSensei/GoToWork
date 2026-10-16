@@ -212,6 +212,21 @@ textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
 .badge.warn { color: var(--warn); border-color: rgba(251, 191, 36, 0.4); background: rgba(251, 191, 36, 0.08); }
 .badge.bad { color: var(--bad); border-color: rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.08); }
 
+/* Model picker chips (provider settings) */
+.model-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.model-chip {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+}
+.model-chip:hover { border-color: var(--accent-dim); color: var(--text-0); }
+.model-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
 /* --------------------------- findings list -------------------- */
 
 .finding { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }

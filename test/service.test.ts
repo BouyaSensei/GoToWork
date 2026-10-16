@@ -70,3 +70,10 @@ test('aiReviewCv surfaces the failure reason for a dead endpoint', async () => {
   assert.equal(outcome!.ok, false);
   assert.match((outcome as { error: string }).error, /Network error/);
 });
+
+test('probeModels reports unreachable for a dead endpoint', async () => {
+  const service = await makeService();
+  const h = await service.probeModels(provider());
+  assert.equal(h.reachable, false);
+  assert.ok(h.error);
+});

@@ -143,6 +143,12 @@ export class AppService {
     return new LocalAIProvider(cfg).health();
   }
 
+  /** Probe an (unsaved) provider config and list the models it serves.
+   *  Short timeout: this is a UI probe, not a generation call. */
+  async probeModels(cfg: ProviderConfig): Promise<ProviderHealth> {
+    return new LocalAIProvider(cfg, { timeoutMs: 10_000 }).health();
+  }
+
   private activeProvider(): LocalAIProvider {
     const s = this.store.get();
     const cfg = s.providers.find((p) => p.id === s.activeProviderId) ?? s.providers[0];

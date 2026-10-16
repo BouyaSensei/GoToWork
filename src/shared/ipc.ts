@@ -39,6 +39,7 @@ export const IPC = {
   providerSetActive: 'provider:set-active',
   providerHealth: 'provider:health',
   providerActiveHealth: 'provider:active-health',
+  providerProbeModels: 'provider:probe-models',
 
   // Profile
   profileGet: 'profile:get',
@@ -87,6 +88,11 @@ export interface ProviderHealthRequest {
   providerId: string;
 }
 
+/** Probe an unsaved (draft) provider config and list the models it serves. */
+export interface ProbeModelsRequest {
+  provider: ProviderConfig;
+}
+
 export interface ProfileSaveRequest {
   profile: UserProfile;
 }
@@ -126,6 +132,8 @@ export interface GoToWorkApi {
   removeProvider(id: string): Promise<void>;
   setActiveProvider(id: string): Promise<void>;
   providerHealth(req: ProviderHealthRequest): Promise<ProviderHealth>;
+  /** List the models served by a (possibly unsaved) provider config. */
+  probeModels(req: ProbeModelsRequest): Promise<ProviderHealth>;
   /** Health of the active (enabled) provider, or null when none is configured. */
   activeProviderHealth(): Promise<ProviderHealth | null>;
 

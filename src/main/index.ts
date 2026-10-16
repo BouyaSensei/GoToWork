@@ -18,6 +18,7 @@ import type {
   ParseCvRequest,
   PickFileRequest,
   ProfileSaveRequest,
+  ProbeModelsRequest,
   ProviderHealthRequest,
   SampleCvRequest,
   SearchRunRequest
@@ -80,6 +81,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.providerHealth, (_e, req: ProviderHealthRequest) =>
     service.providerHealth(req.providerId)
   );
+  ipcMain.handle(IPC.providerProbeModels, (_e, req: ProbeModelsRequest) => service.probeModels(req.provider));
   ipcMain.handle(IPC.providerActiveHealth, () => service.activeProviderHealth());
 
   ipcMain.handle(IPC.profileGet, () => service.getProfile());

@@ -12,6 +12,7 @@ export default function Settings({ onProviderChange }: { onProviderChange: (p: P
     fullName: '', email: '', phone: '', linkedinUrl: '', portfolioUrl: '', location: '', coverLetter: ''
   });
   const [health, setHealth] = useState<Record<string, ProviderHealth>>({});
+  const [modelLists, setModelLists] = useState<Record<string, ProviderHealth>>({});
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -28,6 +29,12 @@ export default function Settings({ onProviderChange }: { onProviderChange: (p: P
   const testHealth = async (id: string) => {
     const h = await window.gotowork.providerHealth({ providerId: id });
     setHealth((prev) => ({ ...prev, [id]: h }));
+  };
+
+  /** Probe the draft config (current form values) and list its models. */
+  const probeModels = async (p: ProviderConfig) => {
+    const h = await window.gotowork.probeModels({ provider: p });
+    setModelLists((prev) => ({ ...prev, [p.id]: h }));
   };
 
   const addProvider = (preset?: (typeof PRESETS)[number]) => {
@@ -135,7 +142,22 @@ export default function Settings({ onProviderChange }: { onProviderChange: (p: P
                 </div>
                 <div>
                   <label className="lbl">Modèle</label>
-                  <input className="field mono" value={p.model} onChange={(e) => updateProvider(p.id, { model: e.target.value })} />
+                  <div className="row" style={{ gap: 8 }}>
+                    <input className="field mono" style={{ flex: 1 }} value={p.model} onChange={(e) => updateProvider(p.id, { model: e.target.value })} />
+                    <button className="btn ghost" onClick={() => void probeModels(p)}>Détecter</button>
+                  </div>
+                  {modelLists[p.id] && modelLists[p.id].reachable && (
+                    <div className="model-list">
+                      {(modelLists[p.id].models ?? []).map((m) => (
+                        <button key={m} type="button" className={`model-chip${m === p.model ? ' active' : ''}`} onClick={() => updateProvider(p.id, { model: m })}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {modelLists[p.id] && !modelLists[p.id].reachable && (
+                    <div className="card-hint" style={{ marginTop: 6 }}>Aucun modèle détecté : {modelLists[p.id].error}</div>
+                  )}
                   <label className="lbl">API key (optionnel)</label>
                   <input className="field mono" type="password" value={p.apiKey ?? ''} onChange={(e) => updateProvider(p.id, { apiKey: e.target.value })} />
                 </div>
