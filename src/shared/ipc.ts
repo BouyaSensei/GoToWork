@@ -7,7 +7,6 @@
  */
 
 import type {
-  AtsReport,
   ChatTurn,
   CvAiOutcome,
   JobPosting,
@@ -16,7 +15,6 @@ import type {
   ProviderHealth,
   SearchMode,
   SearchRun,
-  SlopReport,
   UserProfile
 } from './types';
 
@@ -25,8 +23,6 @@ import type {
 export const IPC = {
   // CV analysis
   cvParse: 'cv:parse',
-  cvAnalyzeAts: 'cv:analyze-ats',
-  cvDetectSlop: 'cv:detect-slop',
   cvAiReview: 'cv:ai-review',
   pickFile: 'dialog:pick-file',
 
@@ -66,14 +62,6 @@ export interface PickFileRequest {
   filters?: { name: string; extensions: string[] }[];
 }
 
-export interface AnalyzeAtsRequest {
-  cv: ParsedCV;
-}
-
-export interface DetectSlopRequest {
-  cv: ParsedCV;
-}
-
 export interface AiReviewCvRequest {
   cv: ParsedCV;
 }
@@ -104,8 +92,6 @@ export interface ChatAskRequest {
   message: string;
   context: {
     cvSummary?: string;
-    atsScore?: number;
-    slopVerdict?: string;
     searchStatus?: string;
     userName?: string;
   };
@@ -114,8 +100,6 @@ export interface ChatAskRequest {
 /** The typed API surface exposed to the renderer via window.gotowork. */
 export interface GoToWorkApi {
   parseCv(req: ParseCvRequest): Promise<ParsedCV>;
-  analyzeAts(req: AnalyzeAtsRequest): Promise<AtsReport>;
-  detectSlop(req: DetectSlopRequest): Promise<SlopReport>;
   /** AI read of the CV; null when no provider is connected, { ok: false } on failure. */
   aiReviewCv(req: AiReviewCvRequest): Promise<CvAiOutcome | null>;
   pickFile(req?: PickFileRequest): Promise<string | null>;

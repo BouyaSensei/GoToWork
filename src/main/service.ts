@@ -10,14 +10,12 @@
 import { randomUUID } from 'node:crypto';
 import type {
   Application,
-  AtsReport,
   JobPosting,
   ParsedCV,
   ProviderConfig,
   ProviderHealth,
   SearchMode,
   SearchRun,
-  SlopReport,
   CvAiOutcome,
   UserProfile
 } from '../shared/types';
@@ -26,8 +24,6 @@ import { Store } from './store';
 import { LocalAIProvider, ProviderError } from './ai/provider';
 import { Chatbot } from './ai/chatbot';
 import { parseCV } from './cv/parser';
-import { analyzeATS } from './cv/ats';
-import { detectSlop } from './cv/slop';
 import { CV_AI_TIMEOUT_MS, analyzeCvWithAI } from './cv/aiReview';
 import { matchJobs } from './search/matcher';
 import { SearchRunManager } from './search/runManager';
@@ -61,14 +57,6 @@ export class AppService {
 
   async parseCv(filePath: string): Promise<ParsedCV> {
     return parseCV(filePath);
-  }
-
-  analyzeAts(cv: ParsedCV): AtsReport {
-    return analyzeATS(cv);
-  }
-
-  detectSlop(cv: ParsedCV): SlopReport {
-    return detectSlop(cv);
   }
 
   /** AI read of the CV (recruiter's perspective) via the active provider.
@@ -257,8 +245,6 @@ export class AppService {
 
 export interface ChatbotContext {
   cvSummary?: string;
-  atsScore?: number;
-  slopVerdict?: string;
   searchStatus?: string;
   userName?: string;
 }

@@ -93,67 +93,6 @@ export type CvAiOutcome =
   | { ok: false; error: string };
 
 /* ------------------------------------------------------------------ */
-/*  ATS analysis                                                       */
-/* ------------------------------------------------------------------ */
-
-export type AtsSystemName =
-  | 'Workday'
-  | 'Greenhouse'
-  | 'Lever'
-  | 'iCIMS'
-  | 'SAP SuccessFactors'
-  | 'SmartRecruiters'
-  | 'BambooHR'
-  | 'Taleo';
-
-export interface AtsCheck {
-  id: string;
-  label: string;
-  /** 0..1 score for this individual check. */
-  score: number;
-  passed: boolean;
-  detail: string;
-}
-
-export interface AtsSystemReport {
-  system: AtsSystemName;
-  popularity: 'popular' | 'niche';
-  overallScore: number; // 0..1
-  checks: AtsCheck[];
-}
-
-export interface AtsReport {
-  cvFile: string;
-  /** Aggregate readability score across all systems, 0..1. */
-  aggregateScore: number;
-  perSystem: AtsSystemReport[];
-  topIssues: string[];
-  recommendations: string[];
-}
-
-/* ------------------------------------------------------------------ */
-/*  AI-slop detection                                                  */
-/* ------------------------------------------------------------------ */
-
-export interface SlopFinding {
-  id: string;
-  category: 'cliche' | 'buzzword' | 'vague' | 'overclaim' | 'formatting';
-  term: string;
-  count: number;
-  severity: 'low' | 'medium' | 'high';
-  suggestion: string;
-}
-
-export interface SlopReport {
-  cvFile: string;
-  /** 0 = clean, 1 = heavy AI-slop. */
-  slopScore: number;
-  findings: SlopFinding[];
-  verdict: 'clean' | 'mild' | 'sloppy';
-  summary: string;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Job search & matching                                              */
 /* ------------------------------------------------------------------ */
 

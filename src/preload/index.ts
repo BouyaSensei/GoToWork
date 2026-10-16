@@ -17,8 +17,6 @@ import type { SearchRun } from '../shared/types';
 // erase at compile time and never create a runtime dependency.
 const IPC = {
   cvParse: 'cv:parse',
-  cvAnalyzeAts: 'cv:analyze-ats',
-  cvDetectSlop: 'cv:detect-slop',
   cvAiReview: 'cv:ai-review',
   pickFile: 'dialog:pick-file',
 
@@ -43,8 +41,6 @@ const IPC = {
 
 const api: GoToWorkApi = {
   parseCv: (req) => ipcRenderer.invoke(IPC.cvParse, req),
-  analyzeAts: (req) => ipcRenderer.invoke(IPC.cvAnalyzeAts, req),
-  detectSlop: (req) => ipcRenderer.invoke(IPC.cvDetectSlop, req),
   aiReviewCv: (req) => ipcRenderer.invoke(IPC.cvAiReview, req),
   pickFile: (req) => ipcRenderer.invoke(IPC.pickFile, req ?? {}),
 

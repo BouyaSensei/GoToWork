@@ -2,7 +2,7 @@
  * Chatbot service.
  *
  * Wraps a `LocalAIProvider` with a job-search-aware system prompt. The context
- * (CV summary, ATS/slop scores, current search run status) is injected into the
+ * (CV summary, current search run status) is injected into the
  * system message so the assistant can answer "how's my search going?", "which
  * jobs are worth applying to?", "why did I not get auto-applied to X?" etc.
  *
@@ -17,8 +17,6 @@ import { LocalAIProvider } from './provider';
 export interface ChatContext {
   /** One-paragraph summary of the parsed CV (title, seniority, top skills). */
   cvSummary?: string;
-  atsScore?: number;
-  slopVerdict?: string;
   /** Live status line for the active search run, if any. */
   searchStatus?: string;
   /** The user's name, so the assistant can address them. */
@@ -68,10 +66,6 @@ function buildSystemPrompt(ctx: ChatContext): string {
 
   if (ctx.userName) parts.push(`The user's name is ${ctx.userName}.`);
   if (ctx.cvSummary) parts.push(`CV summary: ${ctx.cvSummary}`);
-  if (typeof ctx.atsScore === 'number') {
-    parts.push(`ATS readability score: ${(ctx.atsScore * 100).toFixed(0)}%.`);
-  }
-  if (ctx.slopVerdict) parts.push(`AI-slop verdict: ${ctx.slopVerdict}.`);
   if (ctx.searchStatus) parts.push(`Current search status: ${ctx.searchStatus}`);
 
   return parts.join('\n');

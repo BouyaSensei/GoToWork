@@ -11,10 +11,8 @@ import path from 'node:path';
 import { AppService } from './service';
 import { IPC } from '../shared/ipc';
 import type {
-  AnalyzeAtsRequest,
   AiReviewCvRequest,
   ChatAskRequest,
-  DetectSlopRequest,
   ParseCvRequest,
   PickFileRequest,
   ProfileSaveRequest,
@@ -68,8 +66,6 @@ function registerIpc(): void {
     const res = await dialog.showOpenDialog(win, options);
     return res.canceled ? null : res.filePaths[0] ?? null;
   });
-  ipcMain.handle(IPC.cvAnalyzeAts, (_e, req: AnalyzeAtsRequest) => service.analyzeAts(req.cv));
-  ipcMain.handle(IPC.cvDetectSlop, (_e, req: DetectSlopRequest) => service.detectSlop(req.cv));
   ipcMain.handle(IPC.cvAiReview, (_e, req: AiReviewCvRequest) => service.aiReviewCv(req.cv));
 
   ipcMain.handle(IPC.providerList, () => service.listProviders());
