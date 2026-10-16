@@ -154,67 +154,6 @@ export interface SlopReport {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sample CVs by level + comparison (same job field)                  */
-/* ------------------------------------------------------------------ */
-
-/** The three reference levels we generate sample CVs for. */
-export type SampleLevel = 'junior' | 'mid' | 'senior';
-
-/** A generated reference CV at a given level, in the user's own job field. */
-export interface SampleCv {
-  level: SampleLevel;
-  /** Human label for the level, e.g. "Intermédiaire". */
-  levelLabel: string;
-  /** The shared job field, e.g. "Développeur Frontend". */
-  jobFamily: string;
-  /** The reference title, e.g. "Développeur Frontend Senior". */
-  title: string;
-  /** Typical experience range for the level, e.g. "6+ ans". */
-  yearsLabel: string;
-  /** Expected skill set at this level (subset of the field's ladder). */
-  skills: string[];
-  /** Full renderable CV text (French), used as the on-screen reference. */
-  rawText: string;
-}
-
-/** One scored dimension of a level comparison (0..1). */
-export interface LevelDimension {
-  id: string;
-  label: string;
-  score: number;
-  detail: string;
-}
-
-/** How the user's CV compares to one reference level, same field. */
-export interface LevelComparison {
-  level: SampleLevel;
-  jobFamily: string;
-  /** Overall fit of the user's CV to this level, 0..1. */
-  fitScore: number;
-  /** Where the user sits relative to this level. */
-  verdict: 'below' | 'at' | 'above';
-  skillCoverage: { present: string[]; missing: string[] };
-  dimensions: LevelDimension[];
-  /** Concrete things the CV lacks vs this level. */
-  gaps: string[];
-  /** What the CV already does at/above this level. */
-  strengths: string[];
-  /** Actionable steps to reach this level. */
-  nextSteps: string[];
-}
-
-/** The full result of the "sample CVs by level" feature for one CV. */
-export interface SampleCvBundle {
-  jobFamily: string;
-  userTitle: string;
-  userSeniority: SeniorityBand;
-  /** The three reference CVs, ordered junior → mid → senior. */
-  samples: SampleCv[];
-  /** Comparisons aligned with `samples` (same order). */
-  comparisons: LevelComparison[];
-}
-
-/* ------------------------------------------------------------------ */
 /*  Job search & matching                                              */
 /* ------------------------------------------------------------------ */
 

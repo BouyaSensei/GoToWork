@@ -274,30 +274,17 @@ textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
 .empty { text-align: center; color: var(--text-2); padding: 40px 20px; font-size: 13.5px; }
 .divider { height: 1px; background: var(--line); margin: 18px 0; }
 
-/* --------------------------- sample CV by level -------------------- */
+/* --------------------------- AI scan loading ----------------------- */
 
-.level-tabs { display: flex; gap: 8px; }
-.level-tab {
-  font-family: inherit; font-size: 13px; padding: 8px 16px;
-  border-radius: var(--radius-sm); cursor: pointer;
-  background: var(--bg-2); color: var(--text-1);
-  border: 1px solid var(--line-strong);
-  transition: background 0.12s, border-color 0.12s;
+.ai-loading { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-1); }
+.spinner {
+  width: 14px; height: 14px; flex-shrink: 0;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
 }
-.level-tab:hover { background: var(--bg-3); color: var(--text-0); }
-.level-tab.active {
-  background: var(--accent-soft); color: var(--accent);
-  border-color: rgba(45, 212, 191, 0.3); font-weight: 600;
-}
-
-.cv-preview {
-  margin: 0; padding: 14px 16px;
-  background: var(--bg-0); border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  font-family: var(--font-sans); font-size: 12.5px; line-height: 1.55;
-  color: var(--text-1); white-space: pre-wrap; word-break: break-word;
-  max-height: 460px; overflow-y: auto;
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Scrollbars */
 ::-webkit-scrollbar { width: 10px; height: 10px; }

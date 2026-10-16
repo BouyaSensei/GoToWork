@@ -18,7 +18,6 @@ import type {
   SearchMode,
   SearchRun,
   SlopReport,
-  SampleCvBundle,
   CvAiOutcome,
   UserProfile
 } from '../shared/types';
@@ -29,7 +28,6 @@ import { Chatbot } from './ai/chatbot';
 import { parseCV } from './cv/parser';
 import { analyzeATS } from './cv/ats';
 import { detectSlop } from './cv/slop';
-import { buildSampleCvBundle } from './cv/sampleCv';
 import { CV_AI_TIMEOUT_MS, analyzeCvWithAI } from './cv/aiReview';
 import { matchJobs } from './search/matcher';
 import { SearchRunManager } from './search/runManager';
@@ -71,12 +69,6 @@ export class AppService {
 
   detectSlop(cv: ParsedCV): SlopReport {
     return detectSlop(cv);
-  }
-
-  /** Build the three same-field reference CVs (junior/mid/senior) and compare
-   *  the user's CV against each. Deterministic, no AI required. */
-  sampleCompare(cv: ParsedCV): SampleCvBundle {
-    return buildSampleCvBundle(cv);
   }
 
   /** AI read of the CV (recruiter's perspective) via the active provider.

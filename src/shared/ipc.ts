@@ -14,7 +14,6 @@ import type {
   ParsedCV,
   ProviderConfig,
   ProviderHealth,
-  SampleCvBundle,
   SearchMode,
   SearchRun,
   SlopReport,
@@ -28,7 +27,6 @@ export const IPC = {
   cvParse: 'cv:parse',
   cvAnalyzeAts: 'cv:analyze-ats',
   cvDetectSlop: 'cv:detect-slop',
-  cvSampleCompare: 'cv:sample-compare',
   cvAiReview: 'cv:ai-review',
   pickFile: 'dialog:pick-file',
 
@@ -76,10 +74,6 @@ export interface DetectSlopRequest {
   cv: ParsedCV;
 }
 
-export interface SampleCvRequest {
-  cv: ParsedCV;
-}
-
 export interface AiReviewCvRequest {
   cv: ParsedCV;
 }
@@ -122,7 +116,6 @@ export interface GoToWorkApi {
   parseCv(req: ParseCvRequest): Promise<ParsedCV>;
   analyzeAts(req: AnalyzeAtsRequest): Promise<AtsReport>;
   detectSlop(req: DetectSlopRequest): Promise<SlopReport>;
-  sampleCompare(req: SampleCvRequest): Promise<SampleCvBundle>;
   /** AI read of the CV; null when no provider is connected, { ok: false } on failure. */
   aiReviewCv(req: AiReviewCvRequest): Promise<CvAiOutcome | null>;
   pickFile(req?: PickFileRequest): Promise<string | null>;
