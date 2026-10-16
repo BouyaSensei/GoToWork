@@ -12,6 +12,7 @@ import { AppService } from './service';
 import { IPC } from '../shared/ipc';
 import type {
   AnalyzeAtsRequest,
+  AiReviewCvRequest,
   ChatAskRequest,
   DetectSlopRequest,
   ParseCvRequest,
@@ -70,6 +71,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.cvAnalyzeAts, (_e, req: AnalyzeAtsRequest) => service.analyzeAts(req.cv));
   ipcMain.handle(IPC.cvDetectSlop, (_e, req: DetectSlopRequest) => service.detectSlop(req.cv));
   ipcMain.handle(IPC.cvSampleCompare, (_e, req: SampleCvRequest) => service.sampleCompare(req.cv));
+  ipcMain.handle(IPC.cvAiReview, (_e, req: AiReviewCvRequest) => service.aiReviewCv(req.cv));
 
   ipcMain.handle(IPC.providerList, () => service.listProviders());
   ipcMain.handle(IPC.providerSave, (_e, p) => service.saveProvider(p));

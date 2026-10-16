@@ -9,6 +9,7 @@
 import type {
   AtsReport,
   ChatTurn,
+  CvAiReport,
   JobPosting,
   ParsedCV,
   ProviderConfig,
@@ -28,6 +29,7 @@ export const IPC = {
   cvAnalyzeAts: 'cv:analyze-ats',
   cvDetectSlop: 'cv:detect-slop',
   cvSampleCompare: 'cv:sample-compare',
+  cvAiReview: 'cv:ai-review',
   pickFile: 'dialog:pick-file',
 
   // AI providers
@@ -77,6 +79,10 @@ export interface SampleCvRequest {
   cv: ParsedCV;
 }
 
+export interface AiReviewCvRequest {
+  cv: ParsedCV;
+}
+
 export interface ProviderHealthRequest {
   providerId: string;
 }
@@ -111,6 +117,8 @@ export interface GoToWorkApi {
   analyzeAts(req: AnalyzeAtsRequest): Promise<AtsReport>;
   detectSlop(req: DetectSlopRequest): Promise<SlopReport>;
   sampleCompare(req: SampleCvRequest): Promise<SampleCvBundle>;
+  /** AI read of the CV; null when no provider is connected or the call fails. */
+  aiReviewCv(req: AiReviewCvRequest): Promise<CvAiReport | null>;
   pickFile(req?: PickFileRequest): Promise<string | null>;
 
   listProviders(): Promise<ProviderConfig[]>;

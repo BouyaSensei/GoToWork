@@ -74,6 +74,17 @@ export interface ParsedCV {
 
 export type SeniorityBand = 'junior' | 'mid' | 'senior' | 'lead';
 
+/** AI-driven read of the CV (recruiter's perspective), produced by the local
+ *  provider. Only available when a provider is connected — otherwise the UI
+ *  shows nothing for this section. */
+export interface CvAiReport {
+  /** Overall recruiter assessment, 1–2 sentences. */
+  verdict: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+}
+
 /* ------------------------------------------------------------------ */
 /*  ATS analysis                                                       */
 /* ------------------------------------------------------------------ */

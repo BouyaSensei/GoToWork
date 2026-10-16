@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { AtsReport, ParsedCV, SampleCvBundle, SampleLevel, SeniorityBand, SlopReport } from '@shared/types';
+import type { AtsReport, CvAiReport, ParsedCV, SampleCvBundle, SampleLevel, SeniorityBand, SlopReport } from '@shared/types';
 
 /** Pick a CV file via the native dialog and return its path (or null). */
 async function pickCvFile(): Promise<string | null> {
@@ -16,6 +16,7 @@ export default function CvAnalysis() {
   const [ats, setAts] = useState<AtsReport | null>(null);
   const [slop, setSlop] = useState<SlopReport | null>(null);
   const [bundle, setBundle] = useState<SampleCvBundle | null>(null);
+  const [aiReport, setAiReport] = useState<CvAiReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,9 +33,19 @@ export default function CvAnalysis() {
       ]);
       setAts(atsReport);
       setSlop(slopReport);
-      // The sample CVs are static templates: only show them when a local AI
-      // provider is actually connected — otherwise this section returns nothing.
-      setBundle(health?.reachable ? await window.gotowork.sampleCompare({ cv: parsed }) : null);
+      if (health?.reachable) {
+        // Provider connected: run the AI read of the CV + the sample comparison.
+        const [ai, bundle] = await Promise.all([
+          window.gotowork.aiReviewCv({ cv: parsed }),
+          window.gotowork.sampleCompare({ cv: parsed })
+        ]);
+        setAiReport(ai);
+        setBundle(bundle);
+      } else {
+        // No live provider: these sections return nothing.
+        setAiReport(null);
+        setBundle(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -91,6 +102,7 @@ export default function CvAnalysis() {
           )}
         </div>
 
+        {aiReport && <AiPanel report={aiReport} />}
         {ats && <AtsPanel report={ats} />}
         {slop && <SlopPanel report={slop} />}
         {bundle && <SampleCvPanel bundle={bundle} />}
@@ -104,6 +116,23 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="card" style={{ padding: '14px 16px' }}>
       <div className="muted" style={{ fontSize: 12 }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{value}</div>
+    </div>
+  );
+}
+
+function AiPanel({ report }: { report: CvAiReport }) {
+  return (
+    <div className="card">
+      <div className="row spread" style={{ marginBottom: 12 }}>
+        <div>
+          <div className="card-title">Analyse IA</div>
+          <div className="card-hint">{report.verdict}</div>
+        </div>
+        <span className="badge ok">IA locale</span>
+      </div>
+      <LabeledList title="Points forts" items={report.strengths} />
+      <LabeledList title="À améliorer" items={report.weaknesses} />
+      <LabeledList title="Recommandations" items={report.recommendations} />
     </div>
   );
 }

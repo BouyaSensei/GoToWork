@@ -20,6 +20,7 @@ const IPC = {
   cvAnalyzeAts: 'cv:analyze-ats',
   cvDetectSlop: 'cv:detect-slop',
   cvSampleCompare: 'cv:sample-compare',
+  cvAiReview: 'cv:ai-review',
   pickFile: 'dialog:pick-file',
 
   providerList: 'provider:list',
@@ -45,6 +46,7 @@ const api: GoToWorkApi = {
   analyzeAts: (req) => ipcRenderer.invoke(IPC.cvAnalyzeAts, req),
   detectSlop: (req) => ipcRenderer.invoke(IPC.cvDetectSlop, req),
   sampleCompare: (req) => ipcRenderer.invoke(IPC.cvSampleCompare, req),
+  aiReviewCv: (req) => ipcRenderer.invoke(IPC.cvAiReview, req),
   pickFile: (req) => ipcRenderer.invoke(IPC.pickFile, req ?? {}),
 
   listProviders: () => ipcRenderer.invoke(IPC.providerList),
