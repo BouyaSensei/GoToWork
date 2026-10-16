@@ -31,6 +31,34 @@ test('extractJson returns null on garbage', () => {
   assert.equal(extractJson('no json here'), null);
 });
 
+test('extractJson repairs unescaped inner quotes in a complete object', () => {
+  const raw = '{"verdict": "Il a "refait" le site en React", "strengths": ["concret"]}';
+  const out = extractJson<Record<string, unknown>>(raw);
+  assert.ok(out);
+  assert.equal((out as { verdict: string }).verdict, 'Il a "refait" le site en React');
+});
+
+test('extractJson recovers truncated JSON with an earlier unescaped quote', () => {
+  const raw = '{"verdict": "Candidat "full stack" solide", "strengths": ["exp e-commerce", "design system"]';
+  const out = extractJson<Record<string, unknown>>(raw);
+  assert.ok(out);
+  assert.deepEqual((out as { strengths: string[] }).strengths, ['exp e-commerce', 'design system']);
+});
+
+test('extractJson keeps prose-wrapped JSON with trailing commas', () => {
+  const raw = 'Voici : {"a": [1, 2,], "b": "x",} fin';
+  const out = extractJson<Record<string, unknown>>(raw);
+  assert.ok(out);
+  assert.deepEqual((out as { a: number[] }).a, [1, 2]);
+});
+
+test('extractJson repairs swapped closers ("]}" written as "}])', () => {
+  const raw = '{"verdict": "ok", "strengths": ["x"], "weaknesses": ["p", "q"}]';
+  const out = extractJson<Record<string, unknown>>(raw);
+  assert.ok(out);
+  assert.deepEqual((out as { weaknesses: string[] }).weaknesses, ['p', 'q']);
+});
+
 function fakeFetch(body: unknown, ok = true): typeof fetch {
   return (async () =>
     new Response(JSON.stringify(body), { status: ok ? 200 : 500, headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch;

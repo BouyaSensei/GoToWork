@@ -102,6 +102,8 @@ export default function CvAnalysis() {
   );
 }
 
+const ENUM_VERDICTS: string[] = ['positive', 'neutral', 'negative'];
+
 function AiPanel({ report }: { report: CvAiReport }) {
   const strength = (report.strengths ?? []).slice(0, 3);
   const weakness = (report.weaknesses ?? []).slice(0, 3);
@@ -112,12 +114,16 @@ function AiPanel({ report }: { report: CvAiReport }) {
           <div className="card-title">Analyse IA</div>
           <div className="card-hint">Lecture du CV par le modèle local — comme un recruteur.</div>
         </div>
-        {report.verdict && (
+        {report.verdict && ENUM_VERDICTS.includes(report.verdict) && (
           <span className={`badge ${report.verdict === 'positive' ? 'ok' : report.verdict === 'neutral' ? '' : 'warn'}`}>
             {report.verdict === 'positive' ? 'Bon CV' : report.verdict === 'negative' ? 'À retravailler' : 'Moyen'}
           </span>
         )}
       </div>
+
+      {report.verdict && !ENUM_VERDICTS.includes(report.verdict) && (
+        <p className="verdict">{report.verdict}</p>
+      )}
 
       <div className="grid-2">
         <div>

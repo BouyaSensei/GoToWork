@@ -191,39 +191,65 @@ async function safeReadText(res: Response): Promise<string> {
 }
 
 /**
- * Recover a JSON object from a model's raw output. Handles: clean JSON,
- * ```json fences, and prose-wrapped objects by scanning for the first balanced
- * top-level {...}. Returns null if nothing parseable is found.
+ * Recover a JSON object from a model's raw output. Tries, in order: clean
+ * JSON, fenced JSON, whole-candidate repair (unescaped quotes / trailing
+ * commas), the first balanced top-level object (quote-aware scan), and a
+ * truncated-JSON close. Returns null if nothing parseable is found.
  */
 export function extractJson<T = unknown>(raw: string): T | null {
   const trimmed = raw.trim();
 
   // Fast path: it's already valid JSON.
-  try {
-    return JSON.parse(trimmed) as T;
-  } catch {
-    /* fall through */
-  }
+  const direct = tryParse(trimmed);
+  if (direct && typeof direct === 'object') return direct as T;
 
   // Strip a leading/trailing markdown fence if present.
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) {
-    try {
-      return JSON.parse(fenced[1].trim()) as T;
-    } catch {
-      /* fall through */
-    }
+    const inner = tryParse(fenced[1].trim()) ?? tryParse(repairJson(fenced[1].trim()));
+    if (inner && typeof inner === 'object') return inner as T;
   }
 
-  // Scan for the first balanced top-level object.
+  // Work from the first '{' onward (drops any prose prefix).
   const start = trimmed.indexOf('{');
   if (start === -1) return null;
+  const candidate = trimmed.slice(start);
+
+  // Complete JSON with unescaped quotes / trailing commas: repair the whole
+  // candidate. This also covers cases where a brace scan would desync on an
+  // inner quote.
+  const repaired = tryParse(repairJson(candidate));
+  if (repaired && typeof repaired === 'object') return repaired as T;
+
+  // First balanced top-level object (quote-aware scan).
+  const end = findBalancedEnd(candidate);
+  if (end !== -1) {
+    const slice = candidate.slice(0, end + 1);
+    const obj = tryParse(slice) ?? tryParse(repairJson(slice));
+    if (obj && typeof obj === 'object') return obj as T;
+  }
+
+  // No balanced close: the model was cut off mid-JSON. Repair first (so the
+  // closer sees a consistent string state), then close open structures — a
+  // partial report beats no report.
+  const closed =
+    tryParse(closeTruncated(repairJson(candidate))) ??
+    tryParse(repairJson(closeTruncated(candidate)));
+  if (closed && typeof closed === 'object') return closed as T;
+
+  return null;
+}
+
+/** Index of the '}' that closes the first top-level object, or -1. Unlike a
+ *  naive quote toggle, a '"' only ends a string when what follows is
+ *  structural (`,` `}` `]` `:` or end-of-text) — so unescaped inner quotes
+ *  don't desync the scan. */
+function findBalancedEnd(s: string): number {
   let depth = 0;
   let inString = false;
   let escape = false;
-  let end = -1;
-  for (let i = start; i < trimmed.length; i++) {
-    const ch = trimmed[i];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
     if (escape) {
       escape = false;
       continue;
@@ -232,27 +258,25 @@ export function extractJson<T = unknown>(raw: string): T | null {
       escape = true;
       continue;
     }
-    if (ch === '"') inString = !inString;
+    if (ch === '"') {
+      if (!inString) {
+        inString = true;
+      } else {
+        let j = i + 1;
+        while (j < s.length && /\s/.test(s[j])) j++;
+        const next = s[j];
+        if (next === ',' || next === '}' || next === ']' || next === ':' || next === undefined) inString = false;
+      }
+      continue;
+    }
     if (inString) continue;
     if (ch === '{') depth++;
     else if (ch === '}') {
       depth--;
-      if (depth === 0) {
-        end = i;
-        break;
-      }
+      if (depth === 0) return i;
     }
   }
-
-  if (end !== -1) {
-    const slice = trimmed.slice(start, end + 1);
-    return ((tryParse(slice) ?? tryParse(repairJson(slice))) as T | null) ?? null;
-  }
-
-  // No balanced close: the model was cut off mid-JSON. Close the open
-  // structures and repair what we can — a partial report beats no report.
-  const closed = repairJson(closeTruncated(trimmed.slice(start)));
-  return (tryParse(closed) as T | null) ?? null;
+  return -1;
 }
 
 function tryParse(s: string): unknown {
@@ -302,7 +326,59 @@ function repairJson(s: string): string {
     }
     out += ch;
   }
-  return out.replace(/,\s*([}\]])/g, '$1');
+  return fixSwappedClosers(out.replace(/,\s*([}\]])/g, '$1'));
+}
+
+/** Swap adjacent mismatched closers outside strings (`}]` → `]}`) — a common
+ *  LLM slip where the last two closing brackets come out in the wrong order.
+ *  Only swaps when the very next char is the other closer. */
+function fixSwappedClosers(s: string): string {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  const stack: string[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      out += ch;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = true;
+      out += ch;
+      continue;
+    }
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+      out += ch;
+      continue;
+    }
+    if (ch === '}' || ch === ']') {
+      const top = stack[stack.length - 1];
+      const matches = (top === '{' && ch === '}') || (top === '[' && ch === ']');
+      if (!matches && top) {
+        // `}` while an array is open (or `]` while an object is open), and the
+        // next char is the other closer → emit the pair in the right order.
+        const closesTop = top === '[' ? ']' : '}';
+        const other = top === '[' ? '}' : ']';
+        if (ch === other && s[i + 1] === closesTop) {
+          out += closesTop + ch;
+          i++;
+          stack.pop();
+          if (stack.length) stack.pop();
+          continue;
+        }
+      }
+      if (top) stack.pop();
+      out += ch;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
 }
 
 /** Close a truncated JSON prefix: finish an open string (or drop a partial
