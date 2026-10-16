@@ -74,6 +74,13 @@ export interface ParsedCV {
 
 export type SeniorityBand = 'junior' | 'mid' | 'senior' | 'lead';
 
+/** A category of key skills as read by the AI (e.g. "Frontend", "IA",
+ *  "Intérêts" — interests only when the CV lists them as such). */
+export interface CvSkillGroup {
+  cat: string;
+  items: string[];
+}
+
 /** AI-driven read of the CV (recruiter's perspective), produced by the local
  *  provider. Only available when a provider is connected — otherwise the UI
  *  shows nothing for this section. */
@@ -88,8 +95,8 @@ export interface CvAiReport {
   role: string;
   /** Seniority as read by the AI (short). */
   seniority: string;
-  /** Key skills highlighted by the AI (3-8). */
-  skills: string[];
+  /** Key skills grouped by what they are (tech domain, soft skill, interest…). */
+  skillGroups: CvSkillGroup[];
   strengths: string[];
   weaknesses: string[];
   recommendations: string[];

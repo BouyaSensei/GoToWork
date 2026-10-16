@@ -7,7 +7,7 @@
  * nothing for this section instead of fake/template content.
  */
 
-import type { CvAiReport, ParsedCV } from '../../shared/types';
+import type { CvAiReport, CvSkillGroup, ParsedCV } from '../../shared/types';
 import { extractJson, LocalAIProvider, ProviderError } from '../ai/provider';
 
 const MAX_ITEMS = 6;
@@ -25,11 +25,12 @@ export function buildCvAiPrompt(cv: ParsedCV): string {
   const skills = cv.skills.length ? cv.skills.join(', ') : 'aucune détectée';
   return [
     "Tu es un recruteur expérimenté. Analyse le CV ci-dessous et réponds UNIQUEMENT avec un objet JSON valide de cette forme exacte, sans aucun texte avant ou après, sans balises markdown :",
-    '{"verdict": "<appréciation globale en 1-2 phrases>", "atsScore": <note de lisibilité ATS, nombre entier entre 0 et 100>, "atsComment": "<commentaire sur la lisibilité ATS en 1 phrase>", "role": "<poste visé tel que lu dans le CV>", "seniority": "<junior, mid ou senior, avec nuance courte>", "skills": ["<compétences clés>"], "strengths": ["..."], "weaknesses": ["..."], "recommendations": ["..."]}',
+    '{"verdict": "<appréciation globale en 1-2 phrases>", "atsScore": <note de lisibilité ATS, nombre entier entre 0 et 100>, "atsComment": "<commentaire sur la lisibilité ATS en 1 phrase>", "role": "<poste visé tel que lu dans le CV>", "seniority": "<junior, mid ou senior, avec nuance courte>", "skillGroups": [{"cat": "<catégorie>", "items": ["<compétences>"]}], "strengths": ["..."], "weaknesses": ["..."], "recommendations": ["..."]}',
     "Règles :",
     "- Réponds en français, de façon concrète et factuelle (aucun buzzword, aucune formule creuse).",
     "- atsScore est un nombre entier entre 0 et 100, sans texte autour.",
-    `- skills contient 3 à ${MAX_SKILLS} compétences clés réellement présentes dans le CV.`,
+    `- Regroupe les compétences clés du CV en 2 à ${MAX_SKILLS + 2} éléments au total, répartis en 2 à 5 catégories qui reflètent ce qu'elles sont (ex. Frontend, Backend, IA, Outils, Soft skills).`,
+    "- Si le CV comporte une section centres d'intérêt ou loisirs, ajoute une catégorie « Intérêts » avec ces éléments.",
     `- Chaque liste contient 3 à ${MAX_ITEMS} éléments courts (moins de ${MAX_ITEM_LEN} caractères chacun).`,
     "- Ne jamais inventer d'information qui ne figure pas dans le CV.",
     "- Échappe correctement les guillemets doubles à l'intérieur des chaînes JSON.",
@@ -56,13 +57,19 @@ export function parseCvAiReport(raw: string): CvAiReport {
   if (!verdict) {
     throw new ProviderError('Réponse IA incomplète (verdict manquant)', '');
   }
+  let skillGroups = cleanSkillGroups(obj.skillGroups);
+  if (!skillGroups.length) {
+    // Older/shorter answers may carry a flat skills list — keep it as one group.
+    const flat = cleanList(obj.skills, MAX_SKILLS);
+    if (flat.length) skillGroups = [{ cat: 'Compétences', items: flat }];
+  }
   return {
     verdict,
     atsScore: cleanScore(obj.atsScore),
     atsComment: cleanText(obj.atsComment, MAX_COMMENT_LEN),
     role: cleanText(obj.role, 120),
     seniority: cleanText(obj.seniority, 120),
-    skills: cleanList(obj.skills, MAX_SKILLS),
+    skillGroups,
     strengths: cleanList(obj.strengths),
     weaknesses: cleanList(obj.weaknesses),
     recommendations: cleanList(obj.recommendations)
@@ -77,7 +84,7 @@ export async function analyzeCvWithAI(
   const raw = await provider.complete({
     messages: [{ role: 'user', content: buildCvAiPrompt(cv) }],
     temperature: 0.3,
-    maxTokens: 3072
+    maxTokens: 4096
   });
   return parseCvAiReport(raw);
 }
@@ -92,6 +99,22 @@ function cleanScore(value: unknown): number {
   const n = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : NaN;
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/** Clean skill groups: tolerate key variants (cat/category/name, items/skills),
+ *  drop empty groups, cap at 6 groups × 8 items. */
+function cleanSkillGroups(value: unknown): CvSkillGroup[] {
+  const groups: CvSkillGroup[] = [];
+  if (!Array.isArray(value)) return groups;
+  for (const g of value) {
+    if (!g || typeof g !== 'object') continue;
+    const o = g as Record<string, unknown>;
+    const cat = cleanText(o.cat ?? o.category ?? o.name, 60);
+    const items = cleanList(o.items ?? o.skills ?? o.list, MAX_SKILLS);
+    if (cat && items.length) groups.push({ cat, items });
+    if (groups.length >= 6) break;
+  }
+  return groups;
 }
 
 function cleanList(value: unknown, maxItems = MAX_ITEMS): string[] {

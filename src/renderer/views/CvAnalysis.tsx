@@ -114,6 +114,7 @@ function AiPanel({ report }: { report: CvAiReport }) {
   const strength = (report.strengths ?? []).slice(0, 3);
   const weakness = (report.weaknesses ?? []).slice(0, 3);
   const meta = [report.role, report.seniority].filter(Boolean).join(' · ');
+  const groups = report.skillGroups ?? [];
   return (
     <div className="card">
       <div className="row spread">
@@ -121,10 +122,14 @@ function AiPanel({ report }: { report: CvAiReport }) {
           <div className="card-title">Analyse IA</div>
           <div className="card-hint">Lecture du CV par le modèle local — comme un recruteur.</div>
         </div>
-        {report.verdict && ENUM_VERDICTS.includes(report.verdict) && (
+        {report.verdict && ENUM_VERDICTS.includes(report.verdict) ? (
           <span className={`badge ${report.verdict === 'positive' ? 'ok' : report.verdict === 'neutral' ? '' : 'warn'}`}>
             {report.verdict === 'positive' ? 'Bon CV' : report.verdict === 'negative' ? 'À retravailler' : 'Moyen'}
           </span>
+        ) : (
+          report.atsScore > 0 && (
+            <span className={`badge ${atsBadgeClass(report.atsScore)}`}>ATS {report.atsScore}/100</span>
+          )
         )}
       </div>
 
@@ -134,24 +139,30 @@ function AiPanel({ report }: { report: CvAiReport }) {
 
       {meta && <div className="ai-meta">{meta}</div>}
 
-      <hr className="divider" />
-
-      <div className="row spread">
-        <div className="lbl">Lisibilité ATS</div>
-        {report.atsScore > 0 && (
-          <span className={`badge ${atsBadgeClass(report.atsScore)}`}>ATS {report.atsScore}/100</span>
-        )}
-      </div>
-      {report.atsComment && <p className="hint">{report.atsComment}</p>}
-
-      {(report.skills ?? []).length > 0 && (
+      {report.atsComment && (
         <>
-          <div className="lbl">Compétences clés</div>
-          <div className="skill-tags">
-            {report.skills!.map((s) => (
-              <span key={s} className="badge">
-                {s}
-              </span>
+          <hr className="divider" />
+          <div className="sec-title">Lisibilité ATS</div>
+          <p className="hint">{report.atsComment}</p>
+        </>
+      )}
+
+      {groups.length > 0 && (
+        <>
+          <hr className="divider" />
+          <div className="sec-title">Compétences clés</div>
+          <div className="skill-groups">
+            {groups.map((g) => (
+              <div className="skill-group" key={g.cat}>
+                <span className="skill-cat">{g.cat}</span>
+                <div className="skill-tags">
+                  {g.items.map((s) => (
+                    <span key={s} className="badge">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </>
@@ -161,11 +172,11 @@ function AiPanel({ report }: { report: CvAiReport }) {
 
       <div className="grid-2">
         <div>
-          <div className="lbl">Points forts</div>
+          <div className="sec-title ok">Points forts</div>
           <LabeledList items={strength} />
         </div>
         <div>
-          <div className="lbl">À améliorer</div>
+          <div className="sec-title warn">À améliorer</div>
           <LabeledList items={weakness} />
         </div>
       </div>
@@ -173,7 +184,7 @@ function AiPanel({ report }: { report: CvAiReport }) {
       {(report.recommendations ?? []).length > 0 && (
         <>
           <hr className="divider" />
-          <div className="lbl">Recommandations</div>
+          <div className="sec-title">Recommandations</div>
           <ol className="rec-list">
             {report.recommendations!.map((r, i) => (
               <li key={i}>{r}</li>
