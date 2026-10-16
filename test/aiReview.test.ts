@@ -58,3 +58,41 @@ test('parseCvAiReport drops non-string items and caps list length', () => {
   );
   assert.equal(r.strengths.length, 6);
 });
+
+test('parseCvAiReport repairs unescaped inner quotes', () => {
+  const r = parseCvAiReport(
+    '{"verdict": "Un CV avec une "bonne" structure", "strengths": ["a"], "weaknesses": [], "recommendations": []}'
+  );
+  assert.equal(r.verdict, 'Un CV avec une "bonne" structure');
+  assert.deepEqual(r.strengths, ['a']);
+});
+
+test('parseCvAiReport repairs trailing commas', () => {
+  const r = parseCvAiReport(
+    '{"verdict": "OK", "strengths": ["a", "b",], "weaknesses": [], "recommendations": [],}'
+  );
+  assert.equal(r.verdict, 'OK');
+  assert.deepEqual(r.strengths, ['a', 'b']);
+});
+
+test('parseCvAiReport recovers a truncated report by closing open structures', () => {
+  const r = parseCvAiReport('{"verdict": "CV partiel", "strengths": ["a", "b"');
+  assert.equal(r.verdict, 'CV partiel');
+  assert.deepEqual(r.strengths, ['a', 'b']);
+});
+
+test('parseCvAiReport drops a partial key left dangling by truncation', () => {
+  const r = parseCvAiReport('{"verdict": "CV partiel", "strengths": ["a"], "weakne');
+  assert.equal(r.verdict, 'CV partiel');
+  assert.deepEqual(r.strengths, ['a']);
+});
+
+test('parseCvAiReport error includes a snippet of the raw output', () => {
+  try {
+    parseCvAiReport('totalement illisible sans aucune accolade');
+    assert.fail('should have thrown');
+  } catch (e) {
+    assert.match((e as Error).message, /illisible/);
+    assert.ok((e as Error).message.includes('totalement illisible'));
+  }
+});

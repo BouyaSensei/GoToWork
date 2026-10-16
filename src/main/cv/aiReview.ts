@@ -22,12 +22,13 @@ export const CV_AI_TIMEOUT_MS = 300_000;
 export function buildCvAiPrompt(cv: ParsedCV): string {
   const skills = cv.skills.length ? cv.skills.join(', ') : 'aucune détectée';
   return [
-    "Tu es un recruteur expérimenté. Analyse le CV ci-dessous et réponds UNIQUEMENT avec un objet JSON valide de cette forme exacte :",
+    "Tu es un recruteur expérimenté. Analyse le CV ci-dessous et réponds UNIQUEMENT avec un objet JSON valide de cette forme exacte, sans aucun texte avant ou après, sans balises markdown :",
     '{"verdict": "<appréciation globale en 1-2 phrases>", "strengths": ["..."], "weaknesses": ["..."], "recommendations": ["..."]}',
     "Règles :",
     "- Réponds en français, de façon concrète et factuelle (aucun buzzword, aucune formule creuse).",
     `- Chaque liste contient 3 à ${MAX_ITEMS} éléments courts (moins de ${MAX_ITEM_LEN} caractères chacun).`,
     "- Ne jamais inventer d'information qui ne figure pas dans le CV.",
+    "- Échappe correctement les guillemets doubles à l'intérieur des chaînes JSON.",
     "",
     `Poste détecté : ${cv.title ?? 'inconnu'}`,
     `Seniorité : ${cv.seniority} (~${cv.estimatedYearsOfExperience} ans)`,
@@ -37,11 +38,15 @@ export function buildCvAiPrompt(cv: ParsedCV): string {
   ].join('\n');
 }
 
-/** Parse + validate the model's raw output. Throws ProviderError on garbage. */
+/** Parse + validate the model's raw output. Throws ProviderError on garbage,
+ *  including a snippet of the raw answer so failures are diagnosable. */
 export function parseCvAiReport(raw: string): CvAiReport {
   const obj = extractJson<Record<string, unknown>>(raw);
   if (!obj || typeof obj !== 'object') {
-    throw new ProviderError('Réponse IA illisible (JSON attendu)', '');
+    throw new ProviderError(
+      `Réponse IA illisible (JSON attendu) — début de la réponse : « ${raw.trim().slice(0, 120)} »`,
+      ''
+    );
   }
   const verdict = cleanText(obj.verdict, MAX_VERDICT_LEN);
   if (!verdict) {
@@ -63,7 +68,7 @@ export async function analyzeCvWithAI(
   const raw = await provider.complete({
     messages: [{ role: 'user', content: buildCvAiPrompt(cv) }],
     temperature: 0.3,
-    maxTokens: 1200
+    maxTokens: 2048
   });
   return parseCvAiReport(raw);
 }

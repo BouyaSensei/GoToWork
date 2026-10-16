@@ -221,6 +221,7 @@ export function extractJson<T = unknown>(raw: string): T | null {
   let depth = 0;
   let inString = false;
   let escape = false;
+  let end = -1;
   for (let i = start; i < trimmed.length; i++) {
     const ch = trimmed[i];
     if (escape) {
@@ -237,16 +238,113 @@ export function extractJson<T = unknown>(raw: string): T | null {
     else if (ch === '}') {
       depth--;
       if (depth === 0) {
-        const slice = trimmed.slice(start, i + 1);
-        try {
-          return JSON.parse(slice) as T;
-        } catch {
-          return null;
-        }
+        end = i;
+        break;
       }
     }
   }
-  return null;
+
+  if (end !== -1) {
+    const slice = trimmed.slice(start, end + 1);
+    return ((tryParse(slice) ?? tryParse(repairJson(slice))) as T | null) ?? null;
+  }
+
+  // No balanced close: the model was cut off mid-JSON. Close the open
+  // structures and repair what we can — a partial report beats no report.
+  const closed = repairJson(closeTruncated(trimmed.slice(start)));
+  return (tryParse(closed) as T | null) ?? null;
+}
+
+function tryParse(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+/** Conservative repairs for common LLM JSON breakage: unescaped inner quotes
+ *  and trailing commas. Only fixes syntax — never invents content. */
+function repairJson(s: string): string {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (!inStr) {
+      if (ch === '"') inStr = true;
+      out += ch;
+      continue;
+    }
+    if (esc) {
+      esc = false;
+      out += ch;
+      continue;
+    }
+    if (ch === '\\') {
+      esc = true;
+      out += ch;
+      continue;
+    }
+    if (ch === '"') {
+      // A real closing quote is followed by , } ] : or end-of-text. Anything
+      // else means the model forgot to escape an inner quote → escape it.
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      const next = s[j];
+      if (next === ',' || next === '}' || next === ']' || next === ':' || next === undefined) {
+        inStr = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out.replace(/,\s*([}\]])/g, '$1');
+}
+
+/** Close a truncated JSON prefix: finish an open string (or drop a partial
+ *  key), drop a dangling `,"key":` / trailing comma, push missing closers. */
+function closeTruncated(s: string): string {
+  let inStr = false;
+  let esc = false;
+  let strStart = -1;
+  const stack: string[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = true;
+      strStart = i;
+    } else if (ch === '{' || ch === '[') stack.push(ch);
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+  let closed = s;
+  if (inStr) {
+    // Open string at end of input: inside an object it is a partial KEY
+    // (drop the fragment); inside an array it is a partial VALUE (keep it).
+    const container = stack[stack.length - 1];
+    if (container === '{') {
+      let k = strStart - 1;
+      while (k >= 0 && /\s/.test(closed[k])) k--;
+      closed = closed.slice(0, k >= 0 && closed[k] === ',' ? k : strStart).replace(/\s*$/, '');
+    } else {
+      closed += '"';
+    }
+  }
+  // Drop a dangling `,"key":` (key with colon but no value) and bare trailing commas.
+  closed = closed
+    .replace(/,\s*"(?:[^"\\]|\\.)*"\s*:\s*$/, '')
+    .replace(/\s*,\s*$/, '');
+  while (stack.length) closed += stack.pop() === '{' ? '}' : ']';
+  return closed;
 }
 
 /** Convenience: build a provider client from config. */
