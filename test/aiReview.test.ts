@@ -96,3 +96,37 @@ test('parseCvAiReport error includes a snippet of the raw output', () => {
     assert.ok((e as Error).message.includes('totalement illisible'));
   }
 });
+
+test('parseCvAiReport reads the extended sections (ATS, role, seniority, skills)', () => {
+  const r = parseCvAiReport(
+    JSON.stringify({
+      verdict: 'CV solide.',
+      atsScore: 72,
+      atsComment: 'Structure lisible, section compétences claire.',
+      role: 'Développeur Full Stack',
+      seniority: 'mid (4 ans)',
+      skills: ['React', 'Node.js', 'TypeScript'],
+      strengths: ['a'],
+      weaknesses: ['b'],
+      recommendations: ['c']
+    })
+  );
+  assert.equal(r.atsScore, 72);
+  assert.equal(r.role, 'Développeur Full Stack');
+  assert.equal(r.seniority, 'mid (4 ans)');
+  assert.deepEqual(r.skills, ['React', 'Node.js', 'TypeScript']);
+});
+
+test('parseCvAiReport clamps atsScore and tolerates missing extended fields', () => {
+  const r = parseCvAiReport(
+    JSON.stringify({ verdict: 'OK', atsScore: 140, strengths: ['a'], weaknesses: [], recommendations: [] })
+  );
+  assert.equal(r.atsScore, 100);
+  assert.equal(r.role, '');
+  assert.deepEqual(r.skills, []);
+
+  const r2 = parseCvAiReport(
+    JSON.stringify({ verdict: 'OK', atsScore: 'non-numérique', strengths: [], weaknesses: [], recommendations: [] })
+  );
+  assert.equal(r2.atsScore, 0);
+});

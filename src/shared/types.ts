@@ -80,6 +80,16 @@ export type SeniorityBand = 'junior' | 'mid' | 'senior' | 'lead';
 export interface CvAiReport {
   /** Overall recruiter assessment, 1–2 sentences. */
   verdict: string;
+  /** ATS readability estimate (0-100) from the AI read. */
+  atsScore: number;
+  /** One-line explanation of the ATS score. */
+  atsComment: string;
+  /** Role as read by the AI. */
+  role: string;
+  /** Seniority as read by the AI (short). */
+  seniority: string;
+  /** Key skills highlighted by the AI (3-8). */
+  skills: string[];
   strengths: string[];
   weaknesses: string[];
   recommendations: string[];

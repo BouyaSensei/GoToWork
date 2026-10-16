@@ -104,9 +104,16 @@ export default function CvAnalysis() {
 
 const ENUM_VERDICTS: string[] = ['positive', 'neutral', 'negative'];
 
+function atsBadgeClass(score: number): string {
+  if (score >= 70) return 'ok';
+  if (score >= 40) return '';
+  return 'warn';
+}
+
 function AiPanel({ report }: { report: CvAiReport }) {
   const strength = (report.strengths ?? []).slice(0, 3);
   const weakness = (report.weaknesses ?? []).slice(0, 3);
+  const meta = [report.role, report.seniority].filter(Boolean).join(' · ');
   return (
     <div className="card">
       <div className="row spread">
@@ -124,6 +131,33 @@ function AiPanel({ report }: { report: CvAiReport }) {
       {report.verdict && !ENUM_VERDICTS.includes(report.verdict) && (
         <p className="verdict">{report.verdict}</p>
       )}
+
+      {meta && <div className="ai-meta">{meta}</div>}
+
+      <hr className="divider" />
+
+      <div className="row spread">
+        <div className="lbl">Lisibilité ATS</div>
+        {report.atsScore > 0 && (
+          <span className={`badge ${atsBadgeClass(report.atsScore)}`}>ATS {report.atsScore}/100</span>
+        )}
+      </div>
+      {report.atsComment && <p className="hint">{report.atsComment}</p>}
+
+      {(report.skills ?? []).length > 0 && (
+        <>
+          <div className="lbl">Compétences clés</div>
+          <div className="skill-tags">
+            {report.skills!.map((s) => (
+              <span key={s} className="badge">
+                {s}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      <hr className="divider" />
 
       <div className="grid-2">
         <div>
