@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { AtsReport, CvAiReport, ParsedCV, SampleCvBundle, SampleLevel, SeniorityBand, SlopReport } from '@shared/types';
+import type { AtsReport, CvAiOutcome, CvAiReport, ParsedCV, SampleCvBundle, SampleLevel, SeniorityBand, SlopReport } from '@shared/types';
 
 /** Pick a CV file via the native dialog and return its path (or null). */
 async function pickCvFile(): Promise<string | null> {
@@ -16,7 +16,7 @@ export default function CvAnalysis() {
   const [ats, setAts] = useState<AtsReport | null>(null);
   const [slop, setSlop] = useState<SlopReport | null>(null);
   const [bundle, setBundle] = useState<SampleCvBundle | null>(null);
-  const [aiReport, setAiReport] = useState<CvAiReport | null>(null);
+  const [aiOutcome, setAiOutcome] = useState<CvAiOutcome | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,11 +39,11 @@ export default function CvAnalysis() {
           window.gotowork.aiReviewCv({ cv: parsed }),
           window.gotowork.sampleCompare({ cv: parsed })
         ]);
-        setAiReport(ai);
+        setAiOutcome(ai);
         setBundle(bundle);
       } else {
         // No live provider: these sections return nothing.
-        setAiReport(null);
+        setAiOutcome(null);
         setBundle(null);
       }
     } catch (e) {
@@ -102,7 +102,18 @@ export default function CvAnalysis() {
           )}
         </div>
 
-        {aiReport && <AiPanel report={aiReport} />}
+        {aiOutcome?.ok && <AiPanel report={aiOutcome.report} />}
+        {aiOutcome && !aiOutcome.ok && (
+          <div className="card">
+            <div className="row spread">
+              <div>
+                <div className="card-title">Analyse IA</div>
+                <div className="card-hint">{aiOutcome.error.slice(0, 200)}</div>
+              </div>
+              <span className="badge warn">IA indisponible</span>
+            </div>
+          </div>
+        )}
         {ats && <AtsPanel report={ats} />}
         {slop && <SlopPanel report={slop} />}
         {bundle && <SampleCvPanel bundle={bundle} />}

@@ -43,3 +43,30 @@ test('activeProviderHealth reports unreachable for a dead endpoint', async () =>
   assert.ok(health, 'expected a health report, not null');
   assert.equal(health!.reachable, false);
 });
+
+function cvWith(text: string) {
+  return {
+    sourceFile: 'cv.txt',
+    rawText: text,
+    contact: {},
+    sections: {},
+    seniority: 'mid' as const,
+    estimatedYearsOfExperience: 5,
+    skills: ['react'],
+    title: 'Développeur Frontend'
+  };
+}
+
+test('aiReviewCv returns null when no provider is configured', async () => {
+  const service = await makeService();
+  assert.equal(await service.aiReviewCv(cvWith('Axel Pierre')), null);
+});
+
+test('aiReviewCv surfaces the failure reason for a dead endpoint', async () => {
+  const service = await makeService();
+  await service.saveProvider(provider());
+  const outcome = await service.aiReviewCv(cvWith('Axel Pierre'));
+  assert.ok(outcome, 'expected an outcome, not null');
+  assert.equal(outcome!.ok, false);
+  assert.match((outcome as { error: string }).error, /Network error/);
+});

@@ -19,7 +19,7 @@ import type {
   SearchRun,
   SlopReport,
   SampleCvBundle,
-  CvAiReport,
+  CvAiOutcome,
   UserProfile
 } from '../shared/types';
 import { IPC } from '../shared/ipc';
@@ -30,7 +30,7 @@ import { parseCV } from './cv/parser';
 import { analyzeATS } from './cv/ats';
 import { detectSlop } from './cv/slop';
 import { buildSampleCvBundle } from './cv/sampleCv';
-import { analyzeCvWithAI } from './cv/aiReview';
+import { CV_AI_TIMEOUT_MS, analyzeCvWithAI } from './cv/aiReview';
 import { matchJobs } from './search/matcher';
 import { SearchRunManager } from './search/runManager';
 
@@ -80,16 +80,18 @@ export class AppService {
   }
 
   /** AI read of the CV (recruiter's perspective) via the active provider.
-   *  Returns null when no enabled provider is configured or the model call
-   *  fails — the UI then shows nothing for this section. */
-  async aiReviewCv(cv: ParsedCV): Promise<CvAiReport | null> {
+   *  Returns null when no enabled provider is configured (the UI shows
+   *  nothing), and { ok: false, error } when the model call fails — so real
+   *  failures are surfaced instead of silently swallowed. */
+  async aiReviewCv(cv: ParsedCV): Promise<CvAiOutcome | null> {
     const s = this.store.get();
     const cfg = s.providers.find((p) => p.id === s.activeProviderId) ?? s.providers[0];
     if (!cfg || !cfg.enabled) return null;
     try {
-      return await analyzeCvWithAI(new LocalAIProvider(cfg), cv);
+      const provider = new LocalAIProvider(cfg, { timeoutMs: CV_AI_TIMEOUT_MS });
+      return { ok: true, report: await analyzeCvWithAI(provider, cv) };
     } catch (e) {
-      if (e instanceof ProviderError) return null;
+      if (e instanceof ProviderError) return { ok: false, error: e.message };
       throw e;
     }
   }

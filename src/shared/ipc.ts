@@ -9,7 +9,7 @@
 import type {
   AtsReport,
   ChatTurn,
-  CvAiReport,
+  CvAiOutcome,
   JobPosting,
   ParsedCV,
   ProviderConfig,
@@ -117,8 +117,8 @@ export interface GoToWorkApi {
   analyzeAts(req: AnalyzeAtsRequest): Promise<AtsReport>;
   detectSlop(req: DetectSlopRequest): Promise<SlopReport>;
   sampleCompare(req: SampleCvRequest): Promise<SampleCvBundle>;
-  /** AI read of the CV; null when no provider is connected or the call fails. */
-  aiReviewCv(req: AiReviewCvRequest): Promise<CvAiReport | null>;
+  /** AI read of the CV; null when no provider is connected, { ok: false } on failure. */
+  aiReviewCv(req: AiReviewCvRequest): Promise<CvAiOutcome | null>;
   pickFile(req?: PickFileRequest): Promise<string | null>;
 
   listProviders(): Promise<ProviderConfig[]>;

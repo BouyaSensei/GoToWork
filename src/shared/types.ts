@@ -85,6 +85,13 @@ export interface CvAiReport {
   recommendations: string[];
 }
 
+/** Result of an AI CV review: a report, a failure reason (provider connected
+ *  but the call failed — surfaced in the UI), or null when no provider is
+ *  configured/disabled (the UI then shows nothing). */
+export type CvAiOutcome =
+  | { ok: true; report: CvAiReport }
+  | { ok: false; error: string };
+
 /* ------------------------------------------------------------------ */
 /*  ATS analysis                                                       */
 /* ------------------------------------------------------------------ */

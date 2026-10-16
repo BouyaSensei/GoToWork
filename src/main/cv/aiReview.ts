@@ -14,6 +14,10 @@ const MAX_ITEMS = 6;
 const MAX_ITEM_LEN = 200;
 const MAX_VERDICT_LEN = 400;
 
+/** Local models are slow (model load + long generation): a full CV review can
+ *  take several minutes on CPU. Generous timeout so the first call survives. */
+export const CV_AI_TIMEOUT_MS = 300_000;
+
 /** Build the prompt for the AI review. Pure and testable. */
 export function buildCvAiPrompt(cv: ParsedCV): string {
   const skills = cv.skills.length ? cv.skills.join(', ') : 'aucune détectée';
