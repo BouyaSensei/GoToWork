@@ -27,7 +27,7 @@ test('buildCvHighlightPrompt embeds the CV and demands verbatim matches', () => 
   assert.ok(prompt.includes('critical'));
 });
 
-test('parseCvHighlights parses clean JSON anchored in the CV', () => {
+test('parseCvHighlights parses clean JSON anchored in the CV (offsets resolved)', () => {
   const r = parseCvHighlights(
     JSON.stringify({
       highlights: [
@@ -39,14 +39,31 @@ test('parseCvHighlights parses clean JSON anchored in the CV', () => {
   );
   assert.equal(r.length, 2);
   assert.deepEqual(r[0], {
-    match: 'très bon en tout',
+    start: CV_TEXT.indexOf('très bon en tout'),
+    end: CV_TEXT.indexOf('très bon en tout') + 'très bon en tout'.length,
     severity: 'critical',
     note: 'Allégation vague sans chiffre'
   });
   assert.equal(r[1].severity, 'improvement');
+  // Offsets must slice back to the anchor text.
+  assert.equal(CV_TEXT.slice(r[1].start, r[1].end), 'React, TypeScript');
 });
 
-test('parseCvHighlights drops matches not found verbatim in the CV (hallucination guard)', () => {
+test('parseCvHighlights resolves anchors whose whitespace the model rewrote', () => {
+  // The model turns the line break into a space — the span must still resolve.
+  const r = parseCvHighlights(
+    JSON.stringify({
+      highlights: [
+        { match: 'Développeur Frontend Tel : 06 12 34', severity: 'critical', note: 'en-tête' }
+      ]
+    }),
+    CV_TEXT
+  );
+  assert.equal(r.length, 1);
+  assert.equal(CV_TEXT.slice(r[0].start, r[0].end), 'Développeur Frontend\nTel : 06 12 34');
+});
+
+test('parseCvHighlights drops matches not found in the CV (hallucination guard)', () => {
   const r = parseCvHighlights(
     JSON.stringify({
       highlights: [
@@ -57,7 +74,7 @@ test('parseCvHighlights drops matches not found verbatim in the CV (hallucinatio
     CV_TEXT
   );
   assert.equal(r.length, 1);
-  assert.equal(r[0].match, 'très bon en tout');
+  assert.equal(CV_TEXT.slice(r[0].start, r[0].end), 'très bon en tout');
 });
 
 test('parseCvHighlights normalizes severity variants; unknown becomes improvement', () => {

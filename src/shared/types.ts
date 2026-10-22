@@ -109,11 +109,15 @@ export type CvAiOutcome =
   | { ok: true; report: CvAiReport }
   | { ok: false; error: string };
 
-/** One highlighted issue in the CV text (advanced detail view). `match` is an
- *  exact verbatim substring of the CV — the renderer wraps it, so no offsets. */
+/** One highlighted issue in the CV text (advanced detail view). The model
+ *  anchors each issue with a verbatim excerpt; the main process resolves it to
+ *  exact offsets into `ParsedCV.rawText` (whitespace-tolerant), so the
+ *  renderer only slices — never re-matches. */
 export interface CvHighlight {
-  /** Exact verbatim substring of the CV to wrap. */
-  match: string;
+  /** Start offset in rawText (inclusive). */
+  start: number;
+  /** End offset in rawText (exclusive). */
+  end: number;
   /** critical = bloque/dégrade le recrutement (rouge); improvement = axe
    *  d'amélioration facultatif (orange). */
   severity: 'critical' | 'improvement';

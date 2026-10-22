@@ -359,25 +359,25 @@ function LabeledList({ items }: { items: string[] }) {
   );
 }
 
-/** Wrap each highlight's verbatim match in the CV text with a severity mark.
- *  First occurrence of each match; overlapping anchors are dropped. */
+/** Wrap each resolved highlight span in the CV text with a severity mark.
+ *  Offsets come from the main process (already validated against the raw
+ *  text); out-of-range and overlapping spans are dropped as a safety net. */
 function renderHighlighted(text: string, highlights: CvHighlight[]): ReactNode[] {
-  const spans: { start: number; end: number; hl: CvHighlight }[] = [];
-  for (const hl of highlights) {
-    const start = text.indexOf(hl.match);
-    if (start === -1) continue;
-    const end = start + hl.match.length;
-    if (spans.some((s) => start < s.end && end > s.start)) continue;
-    spans.push({ start, end, hl });
+  const spans = highlights
+    .filter((h) => h.start >= 0 && h.end > h.start && h.end <= text.length)
+    .sort((a, b) => a.start - b.start);
+  const kept: typeof spans = [];
+  for (const s of spans) {
+    if (kept.some((k) => s.start < k.end)) continue; // overlap safety net
+    kept.push(s);
   }
-  spans.sort((a, b) => a.start - b.start);
 
   const nodes: ReactNode[] = [];
   let pos = 0;
-  for (const s of spans) {
+  for (const s of kept) {
     if (s.start > pos) nodes.push(text.slice(pos, s.start));
     nodes.push(
-      <mark key={s.start} className={`hl-${s.hl.severity}`} title={s.hl.note || undefined}>
+      <mark key={s.start} className={`hl-${s.severity}`} title={s.note || undefined}>
         {text.slice(s.start, s.end)}
       </mark>
     );

@@ -2,13 +2,14 @@
  * AI highlight engine — the "détail avancé" of the CV analysis.
  *
  * The local model reads the CV and returns a list of issues, each anchored by
- * an EXACT verbatim substring of the CV text (`match`) plus a severity:
+ * a verbatim substring of the CV text (`match`) plus a severity:
  *   - critical    → bloque ou dégrade le recrutement (rouge)
  *   - improvement → axe d'amélioration facultatif (orange)
  *
- * The renderer wraps each `match` in the raw text — no character offsets,
- * which local models cannot be trusted to count. Any `match` that is not found
- * verbatim in the CV is dropped, so hallucinated highlights never render.
+ * The parser resolves every anchor to exact offsets into `rawText` — verbatim
+ * first, then whitespace-normalized (local models routinely rewrite line
+ * breaks and double spaces). Anchors that cannot be resolved are dropped, so
+ * hallucinated highlights never render. The renderer only slices by offset.
  */
 
 import type { CvHighlight, ParsedCV } from '../../shared/types';
@@ -40,7 +41,8 @@ export function buildCvHighlightPrompt(cv: ParsedCV): string {
 
 /** Parse + validate the model's raw output. Throws ProviderError on garbage,
  *  including a snippet of the raw answer so failures are diagnosable.
- *  Matches not found verbatim in `cvText` are dropped (hallucination guard). */
+ *  Each anchor is resolved to offsets in `cvText` (verbatim first, then
+ *  whitespace-normalized); unresolvable anchors are dropped (hallucination guard). */
 export function parseCvHighlights(raw: string, cvText: string): CvHighlight[] {
   const obj = extractJson<Record<string, unknown>>(raw);
   if (!obj || typeof obj !== 'object') {
@@ -50,6 +52,7 @@ export function parseCvHighlights(raw: string, cvText: string): CvHighlight[] {
     );
   }
   const list = Array.isArray(obj.highlights) ? obj.highlights : [];
+  const index = buildNormalizedIndex(cvText);
   const out: CvHighlight[] = [];
   for (const item of list) {
     if (!item || typeof item !== 'object') continue;
@@ -57,16 +60,56 @@ export function parseCvHighlights(raw: string, cvText: string): CvHighlight[] {
     const match =
       typeof o.match === 'string' ? o.match.trim().slice(0, MAX_MATCH_LEN) : '';
     if (!match) continue;
-    // Hallucination guard: the anchor must exist verbatim in the CV.
-    if (cvText.indexOf(match) === -1) continue;
+    // Hallucination guard: the anchor must exist in the CV.
+    const span = resolveAnchor(cvText, index, match);
+    if (!span) continue;
     out.push({
-      match,
+      start: span[0],
+      end: span[1],
       severity: normalizeSeverity(o.severity),
       note: typeof o.note === 'string' ? o.note.trim().slice(0, MAX_NOTE_LEN) : ''
     });
     if (out.length >= MAX_HIGHLIGHTS) break;
   }
   return out;
+}
+
+/** Whitespace runs collapsed to single spaces, plus a map from each normalized
+ *  position back to its original index — lets near-verbatim anchors resolve. */
+function buildNormalizedIndex(text: string): { norm: string; map: number[] } {
+  let norm = '';
+  const map: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (/\s/.test(ch)) {
+      // One space per whitespace run, mapped to the run's first char.
+      if (norm.length > 0 && !/\s/.test(norm[norm.length - 1])) {
+        norm += ' ';
+        map.push(i);
+      }
+    } else {
+      norm += ch;
+      map.push(i);
+    }
+  }
+  return { norm, map };
+}
+
+/** Resolve a model anchor to [start, end) in the original text, or null. */
+function resolveAnchor(
+  cvText: string,
+  index: { norm: string; map: number[] },
+  match: string
+): [number, number] | null {
+  const verbatim = cvText.indexOf(match);
+  if (verbatim !== -1) return [verbatim, verbatim + match.length];
+  // Models rewrite whitespace: retry on the collapsed form.
+  const needle = match.replace(/\s+/g, ' ').trim();
+  if (!needle) return null;
+  const at = index.norm.indexOf(needle);
+  if (at === -1) return null;
+  const lastNorm = at + needle.length - 1;
+  return [index.map[at], index.map[lastNorm] + 1];
 }
 
 /** Tolerate the variants small models emit; anything unknown is a soft issue. */
