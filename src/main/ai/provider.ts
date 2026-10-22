@@ -423,12 +423,13 @@ function closeTruncated(s: string): string {
   }
   let closed = s;
   if (inStr) {
-    // Open string at end of input: inside an object it is a partial KEY
-    // (drop the fragment); inside an array it is a partial VALUE (keep it).
-    const container = stack[stack.length - 1];
-    if (container === '{') {
-      let k = strStart - 1;
-      while (k >= 0 && /\s/.test(closed[k])) k--;
+    // Open string at end of input. What precedes it (skipping whitespace)
+    // decides: a ':' means it is a partial VALUE (keep + close the string);
+    // '{' or ',' means a partial KEY (drop the fragment).
+    let k = strStart - 1;
+    while (k >= 0 && /\s/.test(closed[k])) k--;
+    const precededByColon = k >= 0 && closed[k] === ':';
+    if (stack[stack.length - 1] === '{' && !precededByColon) {
       closed = closed.slice(0, k >= 0 && closed[k] === ',' ? k : strStart).replace(/\s*$/, '');
     } else {
       closed += '"';

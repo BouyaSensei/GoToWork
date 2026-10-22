@@ -80,17 +80,42 @@ export function parseCvAiReport(raw: string): CvAiReport {
   };
 }
 
-/** Run the AI review against a provider. Throws ProviderError on any failure. */
+/** Run the AI review against a provider. Throws ProviderError on any failure.
+ *  Local 9B models are verbose: when the first answer is truncated (token
+ *  limit) we show it back its own cut-off output and demand a shorter one —
+ *  parseCvAiReport/extractJson already salvage a partial report as last resort. */
 export async function analyzeCvWithAI(
   provider: LocalAIProvider,
   cv: ParsedCV
 ): Promise<CvAiReport> {
-  const raw = await provider.complete({
-    messages: [{ role: 'user', content: buildCvAiPrompt(cv) }],
+  const prompt = buildCvAiPrompt(cv);
+  const firstRaw = await provider.complete({
+    messages: [{ role: 'user', content: prompt }],
     temperature: 0.3,
     maxTokens: 4096
   });
-  return parseCvAiReport(raw);
+  try {
+    return parseCvAiReport(firstRaw);
+  } catch (firstErr) {
+    const raw = await provider.complete({
+      messages: [
+        { role: 'user', content: prompt },
+        { role: 'assistant', content: firstRaw },
+        {
+          role: 'user',
+          content:
+            "Ta réponse précédente est coupée au milieu du JSON. Réponds à nouveau avec le JSON COMPLET et beaucoup plus concis : verdict en 1 phrase, atsComment en 1 phrase, 3 éléments max par liste, notes d'une ligne. UNIQUEMENT le JSON, sans texte autour."
+        }
+      ],
+      temperature: 0.3,
+      maxTokens: 4096
+    });
+    try {
+      return parseCvAiReport(raw);
+    } catch (secondErr) {
+      throw secondErr instanceof Error ? secondErr : firstErr;
+    }
+  }
 }
 
 function cleanText(value: unknown, maxLen: number): string {

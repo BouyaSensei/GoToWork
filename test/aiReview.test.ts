@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCvAiPrompt, parseCvAiReport } from '../src/main/cv/aiReview';
-import type { ParsedCV } from '../src/shared/types';
+import { analyzeCvWithAI, buildCvAiPrompt, parseCvAiReport } from '../src/main/cv/aiReview';
+import { LocalAIProvider } from '../src/main/ai/provider';
+import type { ParsedCV, ProviderConfig } from '../src/shared/types';
 
 function cvWith(text: string): ParsedCV {
   return {
@@ -171,4 +172,47 @@ test('parseCvAiReport tolerates French list key variants (pointsForts, aAmeliore
   assert.deepEqual(r.strengths, ['Expérience solide']);
   assert.deepEqual(r.weaknesses, ['Manque de chiffres']);
   assert.deepEqual(r.recommendations, ['Ajouter des métriques']);
+});
+
+test('parseCvAiReport recovers a truncation inside the first string value (the verdict)', () => {
+  // The model hit its token limit mid-verdict: the partial verdict is kept,
+  // not dropped as if it were a dangling key.
+  const r = parseCvAiReport(
+    '{"verdict": "CV bien structuré et détaillé présentant un profil full stack solide avec 4 ans d\'expérience, mais la senio'
+  );
+  assert.ok(r.verdict.startsWith('CV bien structuré'));
+});
+
+function scriptedProvider(responses: string[]) {
+  const requests: unknown[] = [];
+  let i = 0;
+  const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+    requests.push(init?.body ? JSON.parse(String(init.body)) : null);
+    const content = responses[Math.min(i++, responses.length - 1)];
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }) as unknown as typeof fetch;
+  const cfg: ProviderConfig = {
+    id: 't', kind: 'ollama', label: 'T', baseUrl: 'http://127.0.0.1:11434/v1', model: 'm', enabled: true
+  };
+  return { provider: new LocalAIProvider(cfg, { fetchImpl, timeoutMs: 5000 }), requests };
+}
+
+test('analyzeCvWithAI retries with a conciseness nudge when the first answer is unusable', async () => {
+  const good = JSON.stringify({ verdict: 'CV concis.', strengths: ['a'], weaknesses: [], recommendations: [] });
+  const { provider, requests } = scriptedProvider(['totalement illisible sans json', good]);
+  const r = await analyzeCvWithAI(provider, cvWith('Axel'));
+  assert.equal(r.verdict, 'CV concis.');
+  assert.equal(requests.length, 2);
+  const second = requests[1] as { messages: { role: string; content: string }[] };
+  assert.equal(second.messages.length, 3);
+  assert.equal(second.messages[1].role, 'assistant');
+  assert.match(second.messages[2].content, /concis/i);
+});
+
+test('analyzeCvWithAI throws when both attempts are unusable', async () => {
+  const { provider } = scriptedProvider(['rien du tout', 'toujours rien']);
+  await assert.rejects(() => analyzeCvWithAI(provider, cvWith('Axel')), /illisible/);
 });
