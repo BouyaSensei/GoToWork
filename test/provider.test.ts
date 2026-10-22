@@ -97,3 +97,46 @@ test('LocalAIProvider.completeJson parses fenced JSON from model output', async 
   const out = await provider.completeJson<{ pass: boolean }>({ messages: [{ role: 'user', content: 'x' }] });
   assert.deepEqual(out, { pass: true });
 });
+
+test('LocalAIProvider.complete retries empty completions and recovers', async () => {
+  const cfg: ProviderConfig = {
+    id: 'p4', kind: 'ollama', label: 'Ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'm', enabled: true
+  };
+  let calls = 0;
+  const flakyFetch = (async () => {
+    calls++;
+    // First two attempts come back empty, the third has content.
+    const body =
+      calls < 3
+        ? { choices: [{ message: { content: '' } }] }
+        : { choices: [{ message: { content: 'recovered' } }] };
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }) as unknown as typeof fetch;
+  const provider = new LocalAIProvider(cfg, { fetchImpl: flakyFetch, timeoutMs: 5000 });
+  const out = await provider.complete({ messages: [{ role: 'user', content: 'hi' }] });
+  assert.equal(out, 'recovered');
+  assert.equal(calls, 3);
+});
+
+test('LocalAIProvider.complete gives up after retries with a clear error', async () => {
+  const cfg: ProviderConfig = {
+    id: 'p5', kind: 'ollama', label: 'Ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'm', enabled: true
+  };
+  let calls = 0;
+  const emptyFetch = (async () => {
+    calls++;
+    return new Response(JSON.stringify({ choices: [{ message: { content: '' } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }) as unknown as typeof fetch;
+  const provider = new LocalAIProvider(cfg, { fetchImpl: emptyFetch, timeoutMs: 5000 });
+  await assert.rejects(
+    () => provider.complete({ messages: [{ role: 'user', content: 'hi' }] }),
+    /Empty completion.*3 tentatives/
+  );
+  assert.equal(calls, 3);
+});

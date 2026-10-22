@@ -31,6 +31,8 @@ export class ProviderError extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000;
+/** Extra attempts after an empty completion before giving up. */
+const MAX_EMPTY_RETRIES = 2;
 
 export interface ProviderClientOptions {
   fetchImpl?: typeof fetch;
@@ -93,7 +95,10 @@ export class LocalAIProvider {
     }
   }
 
-  /** Run a chat completion against the configured model. */
+  /** Run a chat completion against the configured model. Local models
+   *  occasionally return an empty completion (degenerate sampling / KV hiccup)
+   *  — retry a couple of times before surfacing the error; empty responses
+   *  come back instantly, so retries are cheap. */
   async complete(req: CompletionRequest): Promise<string> {
     const payload: Record<string, unknown> = {
       model: this.config.model,
@@ -102,39 +107,45 @@ export class LocalAIProvider {
       max_tokens: req.maxTokens ?? 1500
     };
 
-    let res: Response;
-    try {
-      res = await this.withTimeout(
-        this.fetchImpl(`${this.resolveEndpoint()}/chat/completions`, {
-          method: 'POST',
-          headers: this.headers(),
-          body: JSON.stringify(payload)
-        })
-      );
-    } catch (err) {
-      throw new ProviderError(
-        `Network error contacting ${this.config.label}: ${errMsg(err)}`,
-        this.config.id,
-        err
-      );
-    }
+    for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+      let res: Response;
+      try {
+        res = await this.withTimeout(
+          this.fetchImpl(`${this.resolveEndpoint()}/chat/completions`, {
+            method: 'POST',
+            headers: this.headers(),
+            body: JSON.stringify(payload)
+          })
+        );
+      } catch (err) {
+        throw new ProviderError(
+          `Network error contacting ${this.config.label}: ${errMsg(err)}`,
+          this.config.id,
+          err
+        );
+      }
 
-    if (!res.ok) {
-      const text = await safeReadText(res);
-      throw new ProviderError(
-        `Provider returned HTTP ${res.status}: ${text.slice(0, 300)}`,
-        this.config.id
-      );
-    }
+      if (!res.ok) {
+        const text = await safeReadText(res);
+        throw new ProviderError(
+          `Provider returned HTTP ${res.status}: ${text.slice(0, 300)}`,
+          this.config.id
+        );
+      }
 
-    const body = (await res.json().catch(() => null)) as {
-      choices?: { message?: { content?: string } }[];
-    } | null;
-    const content = body?.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new ProviderError('Empty completion (no content in response)', this.config.id);
+      const body = (await res.json().catch(() => null)) as {
+        choices?: { message?: { content?: string } }[];
+      } | null;
+      const content = body?.choices?.[0]?.message?.content;
+      if (content) return content.trim();
+
+      // Empty completion: brief pause, then retry.
+      if (attempt < MAX_EMPTY_RETRIES) await delay(500);
     }
-    return content.trim();
+    throw new ProviderError(
+      `Empty completion (no content in response after ${MAX_EMPTY_RETRIES + 1} tentatives)`,
+      this.config.id
+    );
   }
 
   /**
@@ -177,6 +188,10 @@ export class LocalAIProvider {
 }
 
 /* ----------------------------- helpers ---------------------------- */
+
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
