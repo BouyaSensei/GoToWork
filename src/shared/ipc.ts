@@ -9,6 +9,7 @@
 import type {
   ChatTurn,
   CvAiOutcome,
+  CvHighlightOutcome,
   JobPosting,
   ParsedCV,
   ProviderConfig,
@@ -24,6 +25,7 @@ export const IPC = {
   // CV analysis
   cvParse: 'cv:parse',
   cvAiReview: 'cv:ai-review',
+  cvAiHighlight: 'cv:ai-highlight',
   pickFile: 'dialog:pick-file',
 
   // AI providers
@@ -66,6 +68,11 @@ export interface AiReviewCvRequest {
   cv: ParsedCV;
 }
 
+/** Advanced detail: AI-highlighted issues anchored in the CV text. */
+export interface HighlightCvRequest {
+  cv: ParsedCV;
+}
+
 export interface ProviderHealthRequest {
   providerId: string;
 }
@@ -102,6 +109,8 @@ export interface GoToWorkApi {
   parseCv(req: ParseCvRequest): Promise<ParsedCV>;
   /** AI read of the CV; null when no provider is connected, { ok: false } on failure. */
   aiReviewCv(req: AiReviewCvRequest): Promise<CvAiOutcome | null>;
+  /** Advanced detail: issues anchored in the CV text; null when no provider. */
+  highlightCv(req: HighlightCvRequest): Promise<CvHighlightOutcome | null>;
   pickFile(req?: PickFileRequest): Promise<string | null>;
 
   listProviders(): Promise<ProviderConfig[]>;

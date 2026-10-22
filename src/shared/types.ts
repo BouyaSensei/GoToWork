@@ -109,6 +109,22 @@ export type CvAiOutcome =
   | { ok: true; report: CvAiReport }
   | { ok: false; error: string };
 
+/** One highlighted issue in the CV text (advanced detail view). `match` is an
+ *  exact verbatim substring of the CV — the renderer wraps it, so no offsets. */
+export interface CvHighlight {
+  /** Exact verbatim substring of the CV to wrap. */
+  match: string;
+  /** critical = bloque/dégrade le recrutement (rouge); improvement = axe
+   *  d'amélioration facultatif (orange). */
+  severity: 'critical' | 'improvement';
+  /** Short explanation, shown on hover. */
+  note: string;
+}
+
+export type CvHighlightOutcome =
+  | { ok: true; highlights: CvHighlight[] }
+  | { ok: false; error: string };
+
 /* ------------------------------------------------------------------ */
 /*  Job search & matching                                              */
 /* ------------------------------------------------------------------ */

@@ -13,6 +13,7 @@ import { IPC } from '../shared/ipc';
 import type {
   AiReviewCvRequest,
   ChatAskRequest,
+  HighlightCvRequest,
   ParseCvRequest,
   PickFileRequest,
   ProfileSaveRequest,
@@ -67,6 +68,7 @@ function registerIpc(): void {
     return res.canceled ? null : res.filePaths[0] ?? null;
   });
   ipcMain.handle(IPC.cvAiReview, (_e, req: AiReviewCvRequest) => service.aiReviewCv(req.cv));
+  ipcMain.handle(IPC.cvAiHighlight, (_e, req: HighlightCvRequest) => service.highlightCv(req.cv));
 
   ipcMain.handle(IPC.providerList, () => service.listProviders());
   ipcMain.handle(IPC.providerSave, (_e, p) => service.saveProvider(p));

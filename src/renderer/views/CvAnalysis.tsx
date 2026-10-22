@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CvAiOutcome, CvAiReport, ParsedCV } from '@shared/types';
+import type { ReactNode } from 'react';
+import type { CvAiOutcome, CvAiReport, CvHighlight, CvHighlightOutcome, ParsedCV } from '@shared/types';
 
 /** Pick a CV file via the native dialog and return its path (or null). */
 async function pickCvFile(): Promise<string | null> {
@@ -20,6 +21,13 @@ export default function CvAnalysis() {
   const [savedCv, setSavedCv] = useState<ParsedCV | null>(null);
   // Guards the (slow) AI scan against the StrictMode double-mount in dev.
   const scannedFor = useRef<string | null>(null);
+  // Advanced detail: AI-highlighted issues anchored in the CV text.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailOutcome, setDetailOutcome] = useState<CvHighlightOutcome | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  // Which CV the current detail was computed for (cached across toggles).
+  const detailFor = useRef<string | null>(null);
 
   /** AI read of a CV — only when a local provider is actually reachable, so
    *  no template output is ever shown without a live model. */
@@ -59,6 +67,11 @@ export default function CvAnalysis() {
     setBusy(true);
     setError(null);
     setAiOutcome(null);
+    // A new CV invalidates any previously computed detail.
+    setDetailOpen(false);
+    setDetailOutcome(null);
+    setDetailError(null);
+    detailFor.current = null;
     try {
       const parsed = await window.gotowork.parseCv({ filePath });
       // Persist the CV for the whole project (search matching included).
@@ -83,7 +96,42 @@ export default function CvAnalysis() {
     setSavedCv(null);
     setAiOutcome(null);
     scannedFor.current = null;
+    setDetailOpen(false);
+    setDetailOutcome(null);
+    setDetailError(null);
+    detailFor.current = null;
   }, []);
+
+  /** Run the advanced-detail highlight pass for a CV (cached per file). */
+  const runDetail = useCallback(async (cv: ParsedCV) => {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const outcome = await window.gotowork.highlightCv({ cv });
+      if (outcome === null) {
+        // No enabled provider: the advanced detail returns nothing.
+        setDetailOutcome(null);
+        setDetailError("IA locale indisponible — activez un provider dans Réglages.");
+      } else {
+        setDetailOutcome(outcome);
+        if (!outcome.ok) setDetailError(outcome.error);
+      }
+      detailFor.current = cv.sourceFile;
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  const toggleDetail = useCallback(() => {
+    if (!savedCv) return;
+    if (detailOpen) {
+      setDetailOpen(false);
+      return;
+    }
+    setDetailOpen(true);
+    // First open for this CV: compute the highlights.
+    if (detailFor.current !== savedCv.sourceFile || !detailOutcome) void runDetail(savedCv);
+  }, [savedCv, detailOpen, detailOutcome, runDetail]);
 
   return (
     <div>
@@ -106,6 +154,9 @@ export default function CvAnalysis() {
                 </div>
               </div>
               <div className="row">
+                <button className="btn ghost" onClick={toggleDetail} disabled={detailLoading}>
+                  {detailOpen ? 'Masquer le détail' : 'Détail avancé'}
+                </button>
                 <button className="btn" onClick={onEject}>
                   Ejecter le CV
                 </button>
@@ -126,6 +177,46 @@ export default function CvAnalysis() {
             <button className="btn primary" style={{ fontSize: 15, padding: '10px 26px' }} onClick={onPick} disabled={busy}>
               {busy ? 'Analyse…' : 'Commencer le scan'}
             </button>
+          </div>
+        )}
+
+        {detailOpen && savedCv && (
+          <div className="card">
+            <div className="row spread">
+              <div>
+                <div className="card-title">Détail avancé</div>
+                <div className="card-hint">
+                  <span className="hl-dot bad" /> critique — à corriger ·{' '}
+                  <span className="hl-dot warn" /> amélioration facultative
+                </div>
+              </div>
+              {detailLoading && (
+                <span className="ai-loading">
+                  <span className="spinner" />Analyse en cours…
+                </span>
+              )}
+            </div>
+
+            {detailError && (
+              <div className="badge bad" style={{ marginTop: 12 }}>
+                {detailError}
+              </div>
+            )}
+
+            {!detailLoading && detailOutcome?.ok && (
+              <>
+                <p className="hint" style={{ marginTop: 12 }}>
+                  Survolez un passage surligné pour voir l’explication.
+                </p>
+                {detailOutcome.highlights.length === 0 ? (
+                  <p className="hint">Aucun passage signalé par le modèle.</p>
+                ) : (
+                  <div className="cv-text">
+                    {renderHighlighted(savedCv.rawText, detailOutcome.highlights)}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -266,4 +357,32 @@ function LabeledList({ items }: { items: string[] }) {
       ))}
     </ul>
   );
+}
+
+/** Wrap each highlight's verbatim match in the CV text with a severity mark.
+ *  First occurrence of each match; overlapping anchors are dropped. */
+function renderHighlighted(text: string, highlights: CvHighlight[]): ReactNode[] {
+  const spans: { start: number; end: number; hl: CvHighlight }[] = [];
+  for (const hl of highlights) {
+    const start = text.indexOf(hl.match);
+    if (start === -1) continue;
+    const end = start + hl.match.length;
+    if (spans.some((s) => start < s.end && end > s.start)) continue;
+    spans.push({ start, end, hl });
+  }
+  spans.sort((a, b) => a.start - b.start);
+
+  const nodes: ReactNode[] = [];
+  let pos = 0;
+  for (const s of spans) {
+    if (s.start > pos) nodes.push(text.slice(pos, s.start));
+    nodes.push(
+      <mark key={s.start} className={`hl-${s.hl.severity}`} title={s.hl.note || undefined}>
+        {text.slice(s.start, s.end)}
+      </mark>
+    );
+    pos = s.end;
+  }
+  if (pos < text.length) nodes.push(text.slice(pos));
+  return nodes;
 }

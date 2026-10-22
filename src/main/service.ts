@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   Application,
+  CvHighlightOutcome,
   JobPosting,
   ParsedCV,
   ProviderConfig,
@@ -25,6 +26,7 @@ import { LocalAIProvider, ProviderError } from './ai/provider';
 import { Chatbot } from './ai/chatbot';
 import { parseCV } from './cv/parser';
 import { CV_AI_TIMEOUT_MS, analyzeCvWithAI } from './cv/aiReview';
+import { highlightCvWithAI } from './cv/aiHighlight';
 import { matchJobs } from './search/matcher';
 import { SearchRunManager } from './search/runManager';
 
@@ -70,6 +72,21 @@ export class AppService {
     try {
       const provider = new LocalAIProvider(cfg, { timeoutMs: CV_AI_TIMEOUT_MS });
       return { ok: true, report: await analyzeCvWithAI(provider, cv) };
+    } catch (e) {
+      if (e instanceof ProviderError) return { ok: false, error: e.message };
+      throw e;
+    }
+  }
+
+  /** Advanced detail: AI-highlighted issues anchored in the CV text.
+   *  Same contract as aiReviewCv — null when no provider is configured. */
+  async highlightCv(cv: ParsedCV): Promise<CvHighlightOutcome | null> {
+    const s = this.store.get();
+    const cfg = s.providers.find((p) => p.id === s.activeProviderId) ?? s.providers[0];
+    if (!cfg || !cfg.enabled) return null;
+    try {
+      const provider = new LocalAIProvider(cfg, { timeoutMs: CV_AI_TIMEOUT_MS });
+      return { ok: true, highlights: await highlightCvWithAI(provider, cv) };
     } catch (e) {
       if (e instanceof ProviderError) return { ok: false, error: e.message };
       throw e;

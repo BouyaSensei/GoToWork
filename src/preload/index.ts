@@ -18,6 +18,7 @@ import type { SearchRun } from '../shared/types';
 const IPC = {
   cvParse: 'cv:parse',
   cvAiReview: 'cv:ai-review',
+  cvAiHighlight: 'cv:ai-highlight',
   pickFile: 'dialog:pick-file',
 
   providerList: 'provider:list',
@@ -42,6 +43,7 @@ const IPC = {
 const api: GoToWorkApi = {
   parseCv: (req) => ipcRenderer.invoke(IPC.cvParse, req),
   aiReviewCv: (req) => ipcRenderer.invoke(IPC.cvAiReview, req),
+  highlightCv: (req) => ipcRenderer.invoke(IPC.cvAiHighlight, req),
   pickFile: (req) => ipcRenderer.invoke(IPC.pickFile, req ?? {}),
 
   listProviders: () => ipcRenderer.invoke(IPC.providerList),
