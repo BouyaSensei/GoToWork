@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import type { CvAiOutcome, CvAiReport } from '@shared/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CvAiOutcome, CvAiReport, ParsedCV } from '@shared/types';
 
 /** Pick a CV file via the native dialog and return its path (or null). */
 async function pickCvFile(): Promise<string | null> {
@@ -16,6 +16,44 @@ export default function CvAnalysis() {
   const [aiLoading, setAiLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The project CV: persisted once inserted, reused by every view until ejected.
+  const [savedCv, setSavedCv] = useState<ParsedCV | null>(null);
+  // Guards the (slow) AI scan against the StrictMode double-mount in dev.
+  const scannedFor = useRef<string | null>(null);
+
+  /** AI read of a CV — only when a local provider is actually reachable, so
+   *  no template output is ever shown without a live model. */
+  const runScan = useCallback(async (cv: ParsedCV) => {
+    const health = await window.gotowork.activeProviderHealth();
+    if (!health?.reachable) {
+      // No live provider: the analysis returns nothing.
+      setAiOutcome(null);
+      return;
+    }
+    // Provider connected: run the AI read of the CV (loading shown meanwhile).
+    setAiLoading(true);
+    try {
+      setAiOutcome(await window.gotowork.aiReviewCv({ cv }));
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
+  // A persisted CV already exists: show it and run the scan for it.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const cv = await window.gotowork.getCv();
+      if (!cv || cancelled) return;
+      setSavedCv(cv);
+      if (scannedFor.current === cv.sourceFile) return; // StrictMode double-mount
+      scannedFor.current = cv.sourceFile;
+      void runScan(cv);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [runScan]);
 
   const analyze = useCallback(async (filePath: string) => {
     setBusy(true);
@@ -23,30 +61,29 @@ export default function CvAnalysis() {
     setAiOutcome(null);
     try {
       const parsed = await window.gotowork.parseCv({ filePath });
-      const health = await window.gotowork.activeProviderHealth();
-      if (health?.reachable) {
-        // Provider connected: run the AI read of the CV (loading shown meanwhile).
-        setAiLoading(true);
-        try {
-          setAiOutcome(await window.gotowork.aiReviewCv({ cv: parsed }));
-        } finally {
-          setAiLoading(false);
-        }
-      } else {
-        // No live provider: the analysis returns nothing.
-        setAiOutcome(null);
-      }
+      // Persist the CV for the whole project (search matching included).
+      await window.gotowork.saveCv({ cv: parsed });
+      setSavedCv(parsed);
+      scannedFor.current = parsed.sourceFile;
+      await runScan(parsed);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [runScan]);
 
   const onPick = useCallback(async () => {
     const path = await pickCvFile();
     if (path) void analyze(path);
   }, [analyze]);
+
+  const onEject = useCallback(async () => {
+    await window.gotowork.clearCv();
+    setSavedCv(null);
+    setAiOutcome(null);
+    scannedFor.current = null;
+  }, []);
 
   return (
     <div>
@@ -56,23 +93,47 @@ export default function CvAnalysis() {
       </header>
 
       <div className="content">
-        <div className="card">
-          <div className="row spread">
-            <div>
-              <div className="card-title">Votre CV</div>
-              <div className="card-hint">PDF, DOCX ou TXT. Analyse 100% locale.</div>
+        {savedCv ? (
+          <div className="card">
+            <div className="row spread">
+              <div>
+                <div className="card-title">Votre CV</div>
+                <div className="card-hint">
+                  <span className="mono">{savedCv.sourceFile.split(/[\\/]/).pop()}</span>
+                  {' · '}
+                  {savedCv.title ?? 'Rôle non détecté'} · {savedCv.seniority}
+                  {' — '}conservé pour tout le projet (recherche incluse), jusqu’à éjection.
+                </div>
+              </div>
+              <div className="row">
+                <button className="btn" onClick={onEject}>
+                  Ejecter le CV
+                </button>
+                <button className="btn primary" onClick={onPick} disabled={busy}>
+                  {busy ? 'Analyse…' : 'Remplacer le CV'}
+                </button>
+              </div>
             </div>
-            <button className="btn primary" onClick={onPick} disabled={busy}>
-              {busy ? 'Analyse…' : 'Choisir un CV'}
+          </div>
+        ) : (
+          <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+            <div className="card-title">Aucun CV chargé</div>
+            <p className="hint" style={{ maxWidth: 460, margin: '8px auto 20px' }}>
+              Choisissez votre CV (PDF, DOCX ou TXT) — le scan est 100% local. Une fois inséré, il est
+              conservé pour tout le projet, analyse et recherche d’emploi incluses, jusqu’à ce que vous
+              l’éjectiez.
+            </p>
+            <button className="btn primary" style={{ fontSize: 15, padding: '10px 26px' }} onClick={onPick} disabled={busy}>
+              {busy ? 'Analyse…' : 'Commencer le scan'}
             </button>
           </div>
+        )}
 
-          {error && (
-            <div className="badge bad" style={{ marginTop: 12 }}>
-              {error}
-            </div>
-          )}
-        </div>
+        {error && (
+          <div className="badge bad" style={{ marginTop: 12 }}>
+            {error}
+          </div>
+        )}
 
         {aiLoading && (
           <div className="card">
