@@ -25,7 +25,7 @@ export function buildCvHighlightPrompt(cv: ParsedCV): string {
     "Tu es un recruteur expérimenté. Relis le CV ci-dessous et signale les passages à corriger ou améliorer, en répondant UNIQUEMENT avec un objet JSON valide de cette forme exacte, sans aucun texte avant ou après, sans balises markdown :",
     '{"highlights": [{"match": "<passage exact du CV>", "severity": "critical" ou "improvement", "note": "<explication courte>"}]}',
     "Règles :",
-    "- `match` DOIT être un extrait COPIÉ COLLÉ mot pour mot du CV (même orthographe, même ponctuation) — jamais de reformulation, jamais d'ellipse « … ».",
+    "- `match` : citez un fragment court et distinctif du passage à signaler (5 à 15 mots), tel qu'il est écrit dans le CV — sans reformuler, sans ellipse « … ».",
     "- Choisis 3 à 8 passages distincts, chacun court (une phrase ou moins).",
     '- severity "critical" : un problème qui bloque ou dégrade sérieusement le recrutement (coordonnées manquantes ou illisibles, fautes d\'orthographe, dates incohérentes, allégations vagues sans chiffre, section vide ou cassée).',
     '- severity "improvement" : un axe d\'amélioration facultatif (formulation perfectible, ordre des sections, mot-clé manquant, mise en avant insuffisante).',

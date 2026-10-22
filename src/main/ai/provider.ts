@@ -107,6 +107,7 @@ export class LocalAIProvider {
       max_tokens: req.maxTokens ?? 1500
     };
 
+    let lastFinishReason = 'inconnue';
     for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
       let res: Response;
       try {
@@ -134,16 +135,19 @@ export class LocalAIProvider {
       }
 
       const body = (await res.json().catch(() => null)) as {
-        choices?: { message?: { content?: string } }[];
+        choices?: { message?: { content?: string }; finish_reason?: string }[];
       } | null;
-      const content = body?.choices?.[0]?.message?.content;
+      const choice = body?.choices?.[0];
+      const content = choice?.message?.content;
       if (content) return content.trim();
 
-      // Empty completion: brief pause, then retry.
+      // Empty completion: keep the finish reason for diagnostics (a
+      // 'content_filter' here means the model's safety layer refused), then retry.
+      lastFinishReason = choice?.finish_reason ?? 'inconnue';
       if (attempt < MAX_EMPTY_RETRIES) await delay(500);
     }
     throw new ProviderError(
-      `Empty completion (no content in response after ${MAX_EMPTY_RETRIES + 1} tentatives)`,
+      `Empty completion (no content in response after ${MAX_EMPTY_RETRIES + 1} tentatives, finish_reason: ${lastFinishReason})`,
       this.config.id
     );
   }

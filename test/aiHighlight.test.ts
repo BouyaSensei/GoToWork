@@ -19,11 +19,11 @@ function cvWith(text: string): ParsedCV {
   };
 }
 
-test('buildCvHighlightPrompt embeds the CV and demands verbatim matches', () => {
+test('buildCvHighlightPrompt embeds the CV and demands distinctive fragments', () => {
   const prompt = buildCvHighlightPrompt(cvWith(CV_TEXT));
   assert.ok(prompt.includes('Axel Pierre'));
   assert.ok(prompt.includes('"highlights"'));
-  assert.ok(prompt.includes('COPIÉ COLLÉ'));
+  assert.ok(prompt.includes('fragment court et distinctif'), 'asks for short distinctive fragments');
   assert.ok(prompt.includes('critical'));
   // The no-double-quote rule is the #1 defense against invalid JSON from 9B models.
   assert.ok(prompt.includes('N\'utilise JAMAIS de guillemets doubles'));
