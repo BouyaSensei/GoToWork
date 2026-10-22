@@ -154,9 +154,11 @@ export default function CvAnalysis() {
                 </div>
               </div>
               <div className="row">
-                <button className="btn ghost" onClick={toggleDetail} disabled={detailLoading}>
-                  {detailOpen ? 'Masquer le détail' : 'Détail avancé'}
-                </button>
+                {aiOutcome?.ok && (
+                  <button className="btn ghost" onClick={toggleDetail} disabled={detailLoading}>
+                    {detailOpen ? 'Masquer le détail' : 'Détail avancé'}
+                  </button>
+                )}
                 <button className="btn" onClick={onEject}>
                   Ejecter le CV
                 </button>

@@ -25,6 +25,8 @@ test('buildCvHighlightPrompt embeds the CV and demands verbatim matches', () => 
   assert.ok(prompt.includes('"highlights"'));
   assert.ok(prompt.includes('COPIÉ COLLÉ'));
   assert.ok(prompt.includes('critical'));
+  // The no-double-quote rule is the #1 defense against invalid JSON from 9B models.
+  assert.ok(prompt.includes('N\'utilise JAMAIS de guillemets doubles'));
 });
 
 test('parseCvHighlights parses clean JSON anchored in the CV (offsets resolved)', () => {

@@ -70,9 +70,13 @@ export function parseCvAiReport(raw: string): CvAiReport {
     role: cleanText(obj.role, 120),
     seniority: cleanText(obj.seniority, 120),
     skillGroups,
-    strengths: cleanList(obj.strengths),
-    weaknesses: cleanList(obj.weaknesses),
-    recommendations: cleanList(obj.recommendations)
+    // Local models rename the list keys (French variants observed) — tolerate them,
+    // or the Points forts / À améliorer columns silently come back empty.
+    strengths: cleanList(obj.strengths ?? obj.pointsForts ?? obj.points_forts ?? obj.forces),
+    weaknesses: cleanList(
+      obj.weaknesses ?? obj.aAmeliorer ?? obj.a_ameliorer ?? obj.ameliorations ?? obj.toImprove
+    ),
+    recommendations: cleanList(obj.recommendations ?? obj.recommandations)
   };
 }
 

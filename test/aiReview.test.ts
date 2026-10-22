@@ -158,3 +158,17 @@ test('parseCvAiReport tolerates skill-group key variants and drops empty groups'
   );
   assert.deepEqual(r.skillGroups, [{ cat: 'IA', items: ['LLM locaux'] }]);
 });
+
+test('parseCvAiReport tolerates French list key variants (pointsForts, aAmeliorer…)', () => {
+  const r = parseCvAiReport(
+    JSON.stringify({
+      verdict: 'OK',
+      pointsForts: ['Expérience solide'],
+      aAmeliorer: ['Manque de chiffres'],
+      recommandations: ['Ajouter des métriques']
+    })
+  );
+  assert.deepEqual(r.strengths, ['Expérience solide']);
+  assert.deepEqual(r.weaknesses, ['Manque de chiffres']);
+  assert.deepEqual(r.recommendations, ['Ajouter des métriques']);
+});
