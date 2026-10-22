@@ -44,6 +44,14 @@ test('activeProviderHealth reports unreachable for a dead endpoint', async () =>
   assert.equal(health!.reachable, false);
 });
 
+test('providerHealth reports unreachable when the provider is disabled', async () => {
+  const service = await makeService();
+  await service.saveProvider(provider({ enabled: false }));
+  const health = await service.providerHealth('p1');
+  assert.equal(health.reachable, false);
+  assert.equal(health.error, 'Provider désactivé');
+});
+
 function cvWith(text: string) {
   return {
     sourceFile: 'cv.txt',

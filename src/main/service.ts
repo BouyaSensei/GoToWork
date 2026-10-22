@@ -110,6 +110,11 @@ export class AppService {
   async providerHealth(providerId: string): Promise<ProviderHealth> {
     const cfg = this.store.get().providers.find((p) => p.id === providerId);
     if (!cfg) throw new ProviderError(`Unknown provider "${providerId}"`, providerId);
+    // A disabled provider is reported as down — the UI badge goes red instead
+    // of staying green while the endpoint happens to answer.
+    if (!cfg.enabled) {
+      return { providerId, reachable: false, error: "Provider désactivé" };
+    }
     return new LocalAIProvider(cfg).health();
   }
 
